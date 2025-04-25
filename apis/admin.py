@@ -16,7 +16,7 @@ def log_admin_action(admin_id, action, resource_type, resource_id, details=None)
 
 # --- Admin User Management ---
 
-@admin_bp.route('/admin/users', methods=['GET'])
+@admin_bp.route('/admin/users', methods=['GET','OPTIONS'])
 def list_users():
     """Retrieve a paginated list of all users."""
     page = request.args.get('page', 1, type=int)
@@ -42,16 +42,19 @@ def list_users():
         'per_page': per_page
     }), 200
 
-@admin_bp.route('/admin/users/<int:user_id>', methods=['GET'])
+@admin_bp.route('/admin/users/<int:user_id>', methods=['GET', 'OPTIONS'])
 def get_profile(user_id):
     """Retrieve details of a specific user by ID."""
+    if request.method == 'OPTIONS':
+        return '', 204  # Respond to preflight with no content
+
     user = user_manager.get_user_by_id(user_id)
     if not user:
         return jsonify({'error': 'User not found'}), 404
-    
+
     skills = user_manager.search_users(skill='', exclude_user_id=None, page=1, per_page=1)[0]
     skills_list = [skill.strip() for skill in skills[0]['skills'].split(',') if skill.strip()] if skills[0]['skills'] else []
-    
+
     return jsonify({
         'id': user['id'],
         'last_name': user['last_name'],
@@ -173,7 +176,7 @@ def create_post():
 
     return jsonify({'error': 'Failed to create post'}), 500
 
-@admin_bp.route('/admin/posts', methods=['GET'])
+@admin_bp.route('/admin/posts', methods=['GET','OPTIONS'])
 def list_posts():
     """Retrieve a paginated list of all posts."""
     page = request.args.get('page', 1, type=int)
@@ -285,7 +288,7 @@ def add_comment(post_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
-@admin_bp.route('/admin/comments', methods=['GET'])
+@admin_bp.route('/admin/comments', methods=['GET','OPTIONS'])
 def list_comments():
     """Retrieve a paginated list of all comments."""
     page = request.args.get('page', 1, type=int)
@@ -355,7 +358,7 @@ def delete_comment(comment_id):
 
 # --- Admin Message Management ---
 
-@admin_bp.route('/admin/messages', methods=['GET'])
+@admin_bp.route('/admin/messages', methods=['GET','OPTIONS'])
 def list_messages():
     """Retrieve a paginated list of all messages."""
     page = request.args.get('page', 1, type=int)
