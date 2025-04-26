@@ -13,7 +13,8 @@ from apis.admin import admin_bp
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": [
             "http://127.0.0.1:5500",
-            "https://educonnect-front-end.onrender.com"
+            "https://educonnect-front-end.onrender.com",
+            "https://educonnect-admin.onrender.com"
         ]}}, supports_credentials=True)
 
 app.config['JWT_SECRET_KEY'] = 'eyJhbGciOiJIUzI1NiJ9.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'  # CHANGE THIS!
