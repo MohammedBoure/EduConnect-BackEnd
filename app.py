@@ -10,12 +10,12 @@ from apis.posts import posts_bp
 from apis.comments import comments_bp
 from apis.admin import admin_bp
 
-
-
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/api/*": {"origins": [
+            "http://127.0.0.1:5500",
+            "https://educonnect-front-end.onrender.com"
+        ]}}, supports_credentials=True)
 
-# Configuration
 app.config['JWT_SECRET_KEY'] = 'eyJhbGciOiJIUzI1NiJ9.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'  # CHANGE THIS!
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = datetime.timedelta(days=10)
 

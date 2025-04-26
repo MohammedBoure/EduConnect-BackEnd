@@ -16,7 +16,7 @@ def log_admin_action(admin_id, action, resource_type, resource_id, details=None)
 
 # --- Admin User Management ---
 
-@admin_bp.route('/admin/users', methods=['GET'])
+@admin_bp.route('/admin/users', methods=['GET','OPTIONS'])
 def list_users():
     """Retrieve a paginated list of all users."""
     page = request.args.get('page', 1, type=int)
@@ -42,16 +42,19 @@ def list_users():
         'per_page': per_page
     }), 200
 
-@admin_bp.route('/admin/users/<int:user_id>', methods=['GET'])
+@admin_bp.route('/admin/users/<int:user_id>', methods=['GET', 'OPTIONS'])
 def get_profile(user_id):
     """Retrieve details of a specific user by ID."""
+    if request.method == 'OPTIONS':
+        return '', 204  # Respond to preflight with no content
+
     user = user_manager.get_user_by_id(user_id)
     if not user:
         return jsonify({'error': 'User not found'}), 404
-    
+
     skills = user_manager.search_users(skill='', exclude_user_id=None, page=1, per_page=1)[0]
     skills_list = [skill.strip() for skill in skills[0]['skills'].split(',') if skill.strip()] if skills[0]['skills'] else []
-    
+
     return jsonify({
         'id': user['id'],
         'last_name': user['last_name'],
@@ -173,7 +176,7 @@ def create_post():
 
     return jsonify({'error': 'Failed to create post'}), 500
 
-@admin_bp.route('/admin/posts', methods=['GET'])
+@admin_bp.route('/admin/posts', methods=['GET','OPTIONS'])
 def list_posts():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
@@ -288,7 +291,7 @@ def add_comment(post_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
-@admin_bp.route('/admin/comments', methods=['GET'])
+@admin_bp.route('/admin/comments', methods=['GET','OPTIONS'])
 def list_comments():
     """Retrieve a paginated list of all comments."""
     page = request.args.get('page', 1, type=int)
@@ -377,7 +380,7 @@ def delete_comment(comment_id):
 
 # --- Admin Message Management ---
 
-@admin_bp.route('/admin/messages', methods=['GET'])
+@admin_bp.route('/admin/messages', methods=['GET','OPTIONS'])
 def list_messages():
     """Retrieve a paginated list of all messages."""
     page = request.args.get('page', 1, type=int)
@@ -441,8 +444,8 @@ def send_message():
                 'sender_id': sent_message['sender_id'],
                 'receiver_id': sent_message['receiver_id'],
                 'created_at': sent_message['created_at'].isoformat() + "Z"
-                              if isinstance(sent_message.get('created_at'), datetime.datetime)
-                              else str(sent_message.get('created_at'))
+                              if isinstance(sent_message['created_at'], datetime.datetime)
+                              else str(sent_message['created_at'])
             }
         else:
             msg_data = {
@@ -456,33 +459,42 @@ def send_message():
 
     return jsonify({'error': 'Failed to send message'}), 500
 
-@admin_bp.route('/admin/messages/<int:other_user_id>', methods=['POST'])
-def get_messages(other_user_id):
-    """Retrieve messages between two users with pagination."""
-    data = request.get_json()
-    current_user_id = data.get('user_id') if data else None
-    if current_user_id is None:
-        return jsonify({'error': 'Missing user_id'}), 401
-
+@admin_bp.route('/admin/messages/<int:current_user_id>/<int:other_user_id>', methods=['GET']) 
+def get_messages(current_user_id, other_user_id):
+    # التحقق من وجود المستخدم الآخر
     if not user_manager.get_user_by_id(other_user_id):
         return jsonify({'error': 'Other user not found'}), 404
 
+    # التحقق من وجود المستخدم الحالي
+    if not user_manager.get_user_by_id(current_user_id):
+        return jsonify({'error': 'Current user not found'}), 404
+
+    # تحديد الصفحة وعدد الرسائل في كل صفحة
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 30, type=int)
 
+    # جلب الرسائل بين المستخدمين
     messages, total = message_manager.get_messages_between_users(current_user_id, other_user_id, page, per_page)
+
+    # التحقق من وجود رسائل
+    if not messages:
+        return jsonify({'error': 'No messages found'}), 404
+
+    # عكس ترتيب الرسائل (إذا كانت مطلوبة)
     messages.reverse()
 
+    # تجهيز البيانات لرد الاستجابة
     message_list = [{
-        'id': message['id'],
-        'content': message['content'],
-        'sender_id': message['sender_id'],
-        'receiver_id': message['receiver_id'],
-        'created_at': message['created_at'].isoformat() + "Z"
-                      if isinstance(message.get('created_at'), datetime.datetime)
-                      else str(message.get('created_at'))
-    } for message in messages]
+        'id': msg['id'],
+        'content': msg['content'],
+        'sender_id': msg['sender_id'],
+        'receiver_id': msg['receiver_id'],
+        'created_at': msg['created_at'].isoformat() + "Z"
+                      if isinstance(msg['created_at'], datetime.datetime)
+                      else str(msg['created_at'])
+    } for msg in messages]
 
+    # الرد بالرسائل
     return jsonify({
         'messages': message_list,
         'total': total,

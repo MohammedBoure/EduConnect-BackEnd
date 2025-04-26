@@ -57,7 +57,7 @@ GET /admin/users?page=1&per_page=10
 ```javascript
 async function getUsers() {
   try {
-    const response = await fetch('http://example.com/admin/users?page=1&per_page=10', {
+    const response = await fetch('http://example.com/api/admin/users?page=1&per_page=10', {
       method: 'GET',
       headers: {
         'Authorization': 'Bearer YOUR_AUTH_TOKEN'
@@ -102,7 +102,7 @@ GET /admin/users/{user_id}
 ```javascript
 async function getUserDetails(userId) {
   try {
-    const response = await fetch(`http://example.com/admin/users/${userId}`, {
+    const response = await fetch(`http://example.com/api/admin/users/${userId}`, {
       method: 'GET',
       headers: {
         'Authorization': 'Bearer YOUR_AUTH_TOKEN'
@@ -166,7 +166,7 @@ PUT /admin/users/{user_id}
 ```javascript
 async function updateUser(userId, userData) {
   try {
-    const response = await fetch(`http://example.com/admin/users/${userId}`, {
+    const response = await fetch(`http://example.com/api/admin/users/${userId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -221,7 +221,7 @@ DELETE /admin/users/{user_id}
 ```javascript
 async function deleteUser(userId) {
   try {
-    const response = await fetch(`http://example.com/admin/users/${userId}`, {
+    const response = await fetch(`http://example.com/api/admin/users/${userId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': 'Bearer YOUR_AUTH_TOKEN'
@@ -287,7 +287,7 @@ POST /admin/posts/create
 ```javascript
 async function createPost(postData) {
   try {
-    const response = await fetch('http://example.com/admin/posts/create', {
+    const response = await fetch('http://example.com/api/admin/posts/create', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -360,7 +360,7 @@ GET /admin/posts?page=1&per_page=10
 ```javascript
 async function getPosts(page = 1, perPage = 10) {
   try {
-    const response = await fetch(`http://example.com/admin/posts?page=${page}&per_page=${perPage}`, {
+    const response = await fetch(`http://example.com/api/admin/posts?page=${page}&per_page=${perPage}`, {
       method: 'GET',
       headers: {
         'Authorization': 'Bearer YOUR_AUTH_TOKEN'
@@ -420,7 +420,7 @@ PUT /admin/posts/{post_id}
 ```javascript
 async function updatePost(postId, postData) {
   try {
-    const response = await fetch(`http://example.com/admin/posts/${postId}`, {
+    const response = await fetch(`http://example.com/api/admin/posts/${postId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -472,7 +472,7 @@ DELETE /admin/posts/{post_id}
 ```javascript
 async function deletePost(postId) {
   try {
-    const response = await fetch(`http://example.com/admin/posts/${postId}`, {
+    const response = await fetch(`http://example.com/api/admin/posts/${postId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': 'Bearer YOUR_AUTH_TOKEN'
@@ -531,7 +531,7 @@ POST /admin/posts/{post_id}/comments
 ```javascript
 async function addComment(postId, commentData) {
   try {
-    const response = await fetch(`http://example.com/admin/posts/${postId}/comments`, {
+    const response = await fetch(`http://example.com/api/admin/posts/${postId}/comments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -601,7 +601,7 @@ GET /admin/comments?page=1&per_page=20
 ```javascript
 async function getComments(page = 1, perPage = 20) {
   try {
-    const response = await fetch(`http://example.com/admin/comments?page=${page}&per_page=${perPage}`, {
+    const response = await fetch(`http://example.com/api/admin/comments?page=${page}&per_page=${perPage}`, {
       method: 'GET',
       headers: {
         'Authorization': 'Bearer YOUR_AUTH_TOKEN'
@@ -658,7 +658,7 @@ PUT /admin/comments/{comment_id}
 ```javascript
 async function updateComment(commentId, commentData) {
   try {
-    const response = await fetch(`http://example.com/admin/comments/${commentId}`, {
+    const response = await fetch(`http://example.com/api/admin/comments/${commentId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -708,7 +708,7 @@ DELETE /admin/comments/{comment_id}
 ```javascript
 async function deleteComment(commentId) {
   try {
-    const response = await fetch(`http://example.com/admin/comments/${commentId}`, {
+    const response = await fetch(`http://example.com/api/admin/comments/${commentId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': 'Bearer YOUR_AUTH_TOKEN'
@@ -768,7 +768,7 @@ GET /admin/messages?page=1&per_page=30
 ```javascript
 async function getMessages(page = 1, perPage = 30) {
   try {
-    const response = await fetch(`http://example.com/admin/messages?page=${page}&per_page=${perPage}`, {
+    const response = await fetch(`http://example.com/api/admin/messages?page=${page}&per_page=${perPage}`, {
       method: 'GET',
       headers: {
         'Authorization': 'Bearer YOUR_AUTH_TOKEN'
@@ -822,7 +822,7 @@ POST /admin/messages
 ```javascript
 async function sendMessage(messageData) {
   try {
-    const response = await fetch('http://example.com/admin/messages', {
+    const response = await fetch('http://example.com/api/admin/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -857,14 +857,7 @@ sendMessage(newMessage);
 
 **الطلب:**
 ```
-POST /admin/messages/{other_user_id}
-```
-
-**جسم الطلب:**
-```json
-{
-  "user_id": 1
-}
+GET /admin/messages/{current_user_id}/{other_user_id}
 ```
 
 **معلمات الاستعلام:**
@@ -888,7 +881,7 @@ POST /admin/messages/{other_user_id}
       "sender_id": 2,
       "receiver_id": 1,
       "created_at": "2023-05-23T16:35:45.123Z"
-    },
+    }
     // المزيد من الرسائل...
   ],
   "total": 20,
@@ -898,22 +891,38 @@ POST /admin/messages/{other_user_id}
 }
 ```
 
+**أخطاء محتملة:**
+- **404 Not Found**: إذا لم يتم العثور على المستخدم الحالي أو المستخدم الآخر.
+  ```json
+  {"error": "Current user not found"}
+  ```
+  أو
+  ```json
+  {"error": "Other user not found"}
+  ```
+- **404 Not Found**: إذا لم يتم العثور على رسائل بين المستخدمين.
+  ```json
+  {"error": "No messages found"}
+  ```
+
 **مثال باستخدام JavaScript:**
 ```javascript
-async function getConversation(userId, otherUserId, page = 1, perPage = 30) {
+async function getConversation(currentUserId, otherUserId, page = 1, perPage = 30) {
   try {
-    const response = await fetch(`http://example.com/admin/messages/${otherUserId}?page=${page}&per_page=${perPage}`, {
-      method: 'POST',
+    const url = `http://example.com/api/admin/messages/${currentUserId}/${otherUserId}?page=${page}&per_page=${perPage}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer YOUR_AUTH_TOKEN'
-      },
-      body: JSON.stringify({ user_id: userId })
+      }
     });
     
     if (!response.ok) {
       if (response.status === 404) {
-        throw new Error('المستخدم الآخر غير موجود');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'المستخدم أو الرسائل غير موجودة');
       }
       throw new Error('فشل في الحصول على المحادثة');
     }
@@ -922,12 +931,22 @@ async function getConversation(userId, otherUserId, page = 1, perPage = 30) {
     console.log('محادثة المستخدمين:', data);
     return data;
   } catch (error) {
-    console.error('حدث خطأ:', error);
+    console.error('حدث خطأ:', error.message);
+    throw error;
   }
 }
 
 // مثال للاستخدام
-getConversation(1, 2);
+getConversation(1, 2)
+  .then(data => {
+    console.log('الرسائل:', data.messages);
+    console.log('إجمالي الرسائل:', data.total);
+    console.log('الصفحة الحالية:', data.page);
+    console.log('عدد الصفحات:', data.pages);
+  })
+  .catch(error => {
+    console.error('خطأ:', error.message);
+  });
 ```
 
 ### 4. حذف رسالة
@@ -948,7 +967,7 @@ DELETE /admin/messages/{message_id}
 ```javascript
 async function deleteMessage(messageId) {
   try {
-    const response = await fetch(`http://example.com/admin/messages/${messageId}`, {
+    const response = await fetch(`http://example.com/api/admin/messages/${messageId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': 'Bearer YOUR_AUTH_TOKEN'
@@ -957,4 +976,4 @@ async function deleteMessage(messageId) {
     
     if (!response.ok) {
       if (response.status === 404) {
-        throw new Error('الرسالة غير موجودة
+        throw new Error('الرسالة غير موجودة')

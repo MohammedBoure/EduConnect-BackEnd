@@ -132,6 +132,28 @@ def get_user_posts_public(user_id):
         'per_page': per_page
     }), 200
 
+@posts_bp.route('/posts/public/<int:post_id>', methods=['GET','OPTIONS'])
+def get_post_by_id_public(post_id):
+    """Retrieve a single post by its ID (publicly accessible)."""
+    post = post_manager.get_post_by_id(post_id)
+    if not post:
+        return jsonify({'error': 'Post not found'}), 404
+
+    post_data = {
+        'id': post[0],
+        'title': post[1],
+        'content': post[2],
+        'image': post[3],
+        'created_at': post[4].isoformat() + "Z" if isinstance(post[4], datetime.datetime) else str(post[4]),
+        'user_id': post[5],
+        'author': {
+            'first_name': post[6],
+            'last_name': post[7],
+            'photo': post[8]
+        }
+    }
+
+    return jsonify({'post': post_data}), 200
 
 @posts_bp.route('/posts/<int:post_id>', methods=['PUT'])
 @jwt_required()
