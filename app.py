@@ -1,6 +1,5 @@
-from flask import Flask
+from flask import Flask, session
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager
 import datetime
 from database import UserManager  # Assuming this is your database manager
 from apis.auth import auth_bp
@@ -17,11 +16,11 @@ CORS(app, resources={r"/api/*": {"origins": [
             "https://educonnect-admin.onrender.com"
         ]}}, supports_credentials=True)
 
-app.config['JWT_SECRET_KEY'] = 'eyJhbGciOiJIUzI1NiJ9.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'  # CHANGE THIS!
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = datetime.timedelta(days=10)
-
-# Extensions
-jwt = JWTManager(app)
+# Configure secret key for session management
+app.config['SECRET_KEY'] = 'your-secret-key-here'  # CHANGE THIS TO A SECURE RANDOM STRING!
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = datetime.timedelta(days=10)
 
 # Initialize database
 user_manager = UserManager()  # This triggers init_db()

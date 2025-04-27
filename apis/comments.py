@@ -1,12 +1,14 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from flask_jwt_extended import jwt_required
 import datetime
 from utils import safe_get_jwt_identity_as_int
 from database import AuditLogManager,CommentManager, PostManager
+from dateutil.parser import isoparse
+from .auth import login_required
 
 audit_log_manager = AuditLogManager()
 comment_manager = CommentManager()
-posts_manager = PostManager()
+post_manager = PostManager()
 
 def log_admin_action(admin_id, action, resource_type, resource_id, details=None):
     """Log administrative actions for auditing purposes."""
@@ -16,32 +18,45 @@ def log_admin_action(admin_id, action, resource_type, resource_id, details=None)
 comments_bp = Blueprint('comments', __name__)
 
 @comments_bp.route('/posts/<int:post_id>/comments', methods=['POST'])
-@jwt_required()
+@login_required()  # Restrict to users with 'user' role only
 def add_comment(post_id):
-    current_user_id = safe_get_jwt_identity_as_int()
-    if current_user_id is None:
-        return jsonify({'error': 'Invalid token identity'}), 401
-
     """Add a comment to a post."""
     try:
+        # Verify post exists
+        if not post_manager.get_post_by_id(post_id):
+            return jsonify({'error': 'Post not found'}), 404
+
         new_comment = request.get_json()
         if 'content' not in new_comment or 'created_at' not in new_comment:
             return jsonify({'error': 'Missing content or created_at field'}), 400
 
+        # Prevent user_id in request body
+        if 'user_id' in new_comment:
+            return jsonify({'error': 'Specifying user_id is not allowed'}), 403
+
         content = new_comment['content']
         created_at = new_comment['created_at']
 
+        # Validate content length
+        if len(content.strip()) == 0 or len(content) > 1000:
+            return jsonify({'error': 'Content must be between 1 and 1000 characters'}), 400
+
         if isinstance(created_at, str):
             try:
-                created_at = isoparse(created_at)  # Use dateutil.parser.isoparse
+                created_at = isoparse(created_at)
             except ValueError:
                 return jsonify({'error': 'Invalid date format for created_at'}), 400
-
         elif not isinstance(created_at, datetime):
             return jsonify({'error': 'created_at must be a datetime object or ISO format string'}), 400
 
-        # Assume admin user_id=0 for simplicity; adjust based on auth
-        comment_id = comment_manager.create_comment(post_id=post_id, user_id=0, content=content, created_at=created_at)
+        # Use the authenticated user's ID from the session
+        user_id = int(session['user_id'])
+        comment_id = comment_manager.create_comment(
+            post_id=post_id,
+            user_id=user_id,
+            content=content,
+            created_at=created_at
+        )
         if comment_id:
             comment = comment_manager.get_comment_by_id(comment_id)
             return jsonify({
@@ -61,7 +76,7 @@ def add_comment(post_id):
     
 @comments_bp.route('/posts/<int:post_id>/comments', methods=['GET'])
 def get_comments(post_id):
-    if not posts_manager.get_post_by_id(post_id):
+    if not post_manager.get_post_by_id(post_id):
         return jsonify({'error': 'Post not found'}), 404
 
     page = request.args.get('page', 1, type=int)

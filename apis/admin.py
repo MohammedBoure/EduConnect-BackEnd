@@ -1,7 +1,8 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from database import UserManager, PostManager, CommentManager, MessageManager, AuditLogManager
 import datetime
 from dateutil.parser import isoparse
+from .auth import login_required
 
 admin_bp = Blueprint('admin', __name__)
 user_manager = UserManager()
@@ -67,6 +68,7 @@ def get_profile(user_id):
     }), 200
 
 @admin_bp.route('/admin/users/<int:user_id>', methods=['PUT'])
+@login_required(role='admin')  # Restrict to admins only
 def update_profile(user_id):
     """Update a user's details, including their role."""
     user = user_manager.get_user_by_id(user_id)
@@ -97,7 +99,8 @@ def update_profile(user_id):
 
     success = user_manager.update_user(user_id, **update_payload)
     if success:
-        log_admin_action(0, 'update_user', 'user', user_id, f"Updated fields: {list(update_payload.keys())}")
+        # Log the action using the current admin's user_id from session
+        log_admin_action(session['user_id'], 'update_user', 'user', user_id, f"Updated fields: {list(update_payload.keys())}")
         updated_user = user_manager.get_user_by_id(user_id)
         skills = user_manager.search_users(skill='', exclude_user_id=None, page=1, per_page=1)[0]
         skills_list = [skill.strip() for skill in skills[0]['skills'].split(',') if skill.strip()] if skills[0]['skills'] else []
@@ -117,17 +120,19 @@ def update_profile(user_id):
     return jsonify({'error': 'Failed to update user'}), 500
 
 @admin_bp.route('/admin/users/<int:user_id>', methods=['DELETE'])
+@login_required(role='admin')  # Restrict to admins only
 def delete_user(user_id):
     """Delete a user by ID."""
     if not user_manager.get_user_by_id(user_id):
         return jsonify({'error': 'User not found'}), 404
     if user_manager.delete_user(user_id):
-        log_admin_action(0, 'delete_user', 'user', user_id)
+        log_admin_action(session['user_id'], 'delete_user', 'user', user_id)
         return jsonify({'message': 'User deleted successfully'}), 200
     return jsonify({'error': 'Failed to delete user'}), 500
 
 # --- Admin Post Management ---
 @admin_bp.route('/admin/posts/create', methods=['POST'])
+@login_required(role='admin')
 def create_post():
     """Create a new post on behalf of a user."""
     data = request.get_json()
@@ -205,6 +210,7 @@ def list_posts():
     }), 200
     
 @admin_bp.route('/admin/posts/<int:post_id>', methods=['PUT'])
+@login_required(role='admin')
 def update_post(post_id):
     """Update an existing post."""
     post = post_manager.get_post_by_id(post_id)
@@ -239,6 +245,7 @@ def update_post(post_id):
     return jsonify({'error': 'Failed to update post'}), 500
 
 @admin_bp.route('/admin/posts/<int:post_id>', methods=['DELETE'])
+@login_required(role='admin')
 def delete_post(post_id):
     """Delete a post by ID."""
     if not post_manager.get_post_by_id(post_id):
@@ -249,6 +256,7 @@ def delete_post(post_id):
     return jsonify({'error': 'Failed to delete post'}), 500
 # --- Admin Comment Management ---
 @admin_bp.route('/admin/posts/<int:post_id>/comments', methods=['POST'])
+@login_required(role='admin')
 def add_comment(post_id):
     """Add a comment to a post."""
     try:
@@ -320,6 +328,7 @@ def list_comments():
     }), 200
 
 @admin_bp.route('/admin/comments/<int:comment_id>', methods=['PUT'])
+@login_required(role='admin')
 def update_comment(comment_id):
     """Update an existing comment."""
     
@@ -369,6 +378,7 @@ def update_comment(comment_id):
     return jsonify({'error': 'Failed to update comment'}), 500
 
 @admin_bp.route('/admin/comments/<int:comment_id>', methods=['DELETE','OPTIONS'])
+@login_required(role='admin')
 def delete_comment(comment_id):
     """Delete a comment by ID."""
     if not comment_manager.get_comment_by_id(comment_id):
@@ -404,6 +414,7 @@ def list_messages():
     }), 200
 
 @admin_bp.route('/admin/messages/<int:message_id>', methods=['DELETE'])
+@login_required(role='admin')
 def delete_message(message_id):
     """Delete a message by ID."""
     if not message_manager.get_message_by_id(message_id):
@@ -414,6 +425,7 @@ def delete_message(message_id):
     return jsonify({'error': 'Failed to delete message'}), 500
 
 @admin_bp.route('/admin/messages', methods=['POST'])
+@login_required(role='admin')
 def send_message():
     """Send a new message from one user to another."""
     data = request.get_json()
@@ -460,6 +472,7 @@ def send_message():
     return jsonify({'error': 'Failed to send message'}), 500
 
 @admin_bp.route('/admin/messages/<int:current_user_id>/<int:other_user_id>', methods=['GET']) 
+@login_required(role='admin')
 def get_messages(current_user_id, other_user_id):
     # التحقق من وجود المستخدم الآخر
     if not user_manager.get_user_by_id(other_user_id):
