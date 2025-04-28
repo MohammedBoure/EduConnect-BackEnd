@@ -1,8 +1,6 @@
 from flask import Blueprint, request, jsonify, session
-from flask_jwt_extended import jwt_required
 import datetime
-from utils import safe_get_jwt_identity_as_int
-from database import AuditLogManager,CommentManager, PostManager
+from database import AuditLogManager, CommentManager, PostManager
 from dateutil.parser import isoparse
 from .auth import login_required
 
@@ -14,11 +12,10 @@ def log_admin_action(admin_id, action, resource_type, resource_id, details=None)
     """Log administrative actions for auditing purposes."""
     audit_log_manager.log_action(admin_id, action, resource_type, resource_id, details)
 
-
 comments_bp = Blueprint('comments', __name__)
 
 @comments_bp.route('/posts/<int:post_id>/comments', methods=['POST'])
-@login_required()  # Restrict to users with 'user' role only
+@login_required()  # Restrict to logged-in users only
 def add_comment(post_id):
     """Add a comment to a post."""
     try:
@@ -46,11 +43,14 @@ def add_comment(post_id):
                 created_at = isoparse(created_at)
             except ValueError:
                 return jsonify({'error': 'Invalid date format for created_at'}), 400
-        elif not isinstance(created_at, datetime):
+        elif not isinstance(created_at, datetime.datetime):
             return jsonify({'error': 'created_at must be a datetime object or ISO format string'}), 400
 
-        # Use the authenticated user's ID from the session
-        user_id = int(session['user_id'])
+        # Get the authenticated user's ID from the session
+        user_id = session.get('user_id')
+        if user_id is None:
+            return jsonify({'error': 'User not authenticated'}), 401
+
         comment_id = comment_manager.create_comment(
             post_id=post_id,
             user_id=user_id,
@@ -73,9 +73,10 @@ def add_comment(post_id):
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
+
 @comments_bp.route('/posts/<int:post_id>/comments', methods=['GET'])
 def get_comments(post_id):
+    """Get comments for a post."""
     if not post_manager.get_post_by_id(post_id):
         return jsonify({'error': 'Post not found'}), 404
 
@@ -87,15 +88,15 @@ def get_comments(post_id):
     comment_list = []
     for c in comments:
         comment_data = {
-            'id': c['id'],  # هنا نستخدم المفتاح 'id' بدلاً من c[0]
-            'content': c['content'],  # استخدم المفتاح 'content' بدلاً من c[1]
+            'id': c['id'],
+            'content': c['content'],
             'created_at': c['created_at'].isoformat() + "Z" if isinstance(c['created_at'], datetime.datetime) else str(c['created_at']),
-            'post_id': c['post_id'],  # استخدم المفتاح 'post_id' بدلاً من c[3]
-            'user_id': c['user_id'],  # استخدم المفتاح 'user_id' بدلاً من c[4]
+            'post_id': c['post_id'],
+            'user_id': c['user_id'],
             'author': {
-                'first_name': c['first_name'],  # استخدم المفتاح 'first_name' بدلاً من c[5]
-                'last_name': c['last_name'],  # استخدم المفتاح 'last_name' بدلاً من c[6]
-                'photo': c['photo']  # استخدم المفتاح 'photo' بدلاً من c[7]
+                'first_name': c['first_name'],
+                'last_name': c['last_name'],
+                'photo': c['photo']
             }
         }
         comment_list.append(comment_data)
@@ -108,9 +109,8 @@ def get_comments(post_id):
         'per_page': per_page
     }), 200
 
-
 @comments_bp.route('/comments/<int:comment_id>', methods=['PUT'])
-@jwt_required()
+@login_required()  # Require session authentication
 def update_comment(comment_id):
     """Update an existing comment."""
     comment = comment_manager.get_comment_by_id(comment_id)
@@ -123,7 +123,8 @@ def update_comment(comment_id):
         return jsonify({'error': 'Comment content cannot be empty'}), 400
 
     if comment_manager.update_comment(comment_id, content):
-        log_admin_action(0, 'update_comment', 'comment', comment_id, f"New content: {content[:50]}...")
+        admin_id = session.get('user_id', 0)
+        log_admin_action(admin_id, 'update_comment', 'comment', comment_id, f"New content: {content[:50]}...")
         updated_comment = comment_manager.get_comment_by_id(comment_id)
         comment_data = {
             'id': updated_comment['id'],
@@ -141,16 +142,17 @@ def update_comment(comment_id):
     return jsonify({'error': 'Failed to update comment'}), 500
 
 @comments_bp.route('/comments/<int:comment_id>', methods=['DELETE'])
-@jwt_required()
+@login_required()  # Require session authentication
 def delete_comment(comment_id):
-    current_user_id = safe_get_jwt_identity_as_int()
-    if current_user_id is None:
-        return jsonify({'error': 'Invalid token identity'}), 401
-
     """Delete a comment by ID."""
+    if session.get('user_id') is None:
+        return jsonify({'error': 'User not authenticated'}), 401
+
     if not comment_manager.get_comment_by_id(comment_id):
         return jsonify({'error': 'Comment not found'}), 404
+
     if comment_manager.delete_comment(comment_id):
-        log_admin_action(0, 'delete_comment', 'comment', comment_id)
+        admin_id = session.get('user_id', 0)
+        log_admin_action(admin_id, 'delete_comment', 'comment', comment_id)
         return jsonify({'message': 'Comment deleted successfully'}), 200
     return jsonify({'error': 'Failed to delete comment'}), 500
