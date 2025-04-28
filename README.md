@@ -1,3 +1,7 @@
+# رابط الموقع الثابت الدي يتعامل مع الواجهة الخلفية 
+https://educonnect-admin.onrender.com
+
+
 # واجهة برمجة تطبيقات EduConnect
 
 ## نظرة عامة
