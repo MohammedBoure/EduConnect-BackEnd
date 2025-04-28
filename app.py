@@ -18,8 +18,9 @@ CORS(app, resources={r"/api/*": {"origins": [
 
 # Configure secret key for session management
 app.config['SECRET_KEY'] = 'your-secret-key-here'  # CHANGE THIS TO A SECURE RANDOM STRING!
+app.config['SESSION_COOKIE_SECURE'] = True  # Set to True if using HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['PERMANENT_SESSION_LIFETIME'] = datetime.timedelta(days=10)
 
 # Initialize database
