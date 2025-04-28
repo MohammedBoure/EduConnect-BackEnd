@@ -68,7 +68,7 @@ def get_profile(user_id):
     }), 200
 
 @admin_bp.route('/admin/users/<int:user_id>', methods=['PUT'])
-@login_required(role='admin')  # Restrict to admins only
+@login_required(role='admin')
 def update_profile(user_id):
     """Update a user's details, including their role."""
     user = user_manager.get_user_by_id(user_id)
@@ -82,28 +82,48 @@ def update_profile(user_id):
     skills_data = data.get('skills')
     skills = None
     if skills_data is not None:
-        skills = skills_data if isinstance(skills_data, list) else [skill.strip() for skill in skills_data.split(',') if skill.strip()]
+        if isinstance(skills_data, list):
+            skills = skills_data
+        else:
+            skills = [skill.strip() for skill in skills_data.split(',') if skill.strip()]
 
     update_payload = {}
-    if data.get('last_name') is not None: update_payload['last_name'] = data['last_name']
-    if data.get('first_name') is not None: update_payload['first_name'] = data['first_name']
-    if data.get('department') is not None: update_payload['department'] = data['department']
-    if skills is not None: update_payload['skills'] = skills
-    if data.get('photo') is not None: update_payload['photo'] = data['photo']
-    if data.get('role') in ['user', 'admin']: update_payload['role'] = data['role']
-    if data.get('email') is not None: update_payload['email'] = data['email']
-    if data.get('password') is not None: update_payload['password'] = data['password']
+    if data.get('last_name') is not None:
+        update_payload['last_name'] = data['last_name']
+    if data.get('first_name') is not None:
+        update_payload['first_name'] = data['first_name']
+    if data.get('department') is not None:
+        update_payload['department'] = data['department']
+    if skills is not None:
+        update_payload['skills'] = skills
+    if data.get('photo') is not None:
+        update_payload['photo'] = data['photo']
+    if data.get('role') in ['user', 'admin']:
+        update_payload['role'] = data['role']
+    if data.get('email') is not None:
+        update_payload['email'] = data['email']
+    if data.get('password') is not None:
+        update_payload['password'] = data['password']
 
     if not update_payload:
         return jsonify({'error': 'No valid fields provided for update'}), 400
 
     success = user_manager.update_user(user_id, **update_payload)
     if success:
-        # Log the action using the current admin's user_id from session
         log_admin_action(session['user_id'], 'update_user', 'user', user_id, f"Updated fields: {list(update_payload.keys())}")
+
         updated_user = user_manager.get_user_by_id(user_id)
-        skills = user_manager.search_users(skill='', exclude_user_id=None, page=1, per_page=1)[0]
-        skills_list = [skill.strip() for skill in skills[0]['skills'].split(',') if skill.strip()] if skills[0]['skills'] else []
+        updated_user = dict(updated_user)  # 🔥 حل المشكلة هنا: تحويل الـ Row إلى dict
+        
+        # Handle 'skills' field safely
+        skills_value = updated_user.get('skills')
+        if isinstance(skills_value, list):
+            skills_list = skills_value
+        elif isinstance(skills_value, str) and skills_value:
+            skills_list = [skill.strip() for skill in skills_value.split(',') if skill.strip()]
+        else:
+            skills_list = []
+
         return jsonify({
             'message': 'User updated successfully',
             'user': {
@@ -111,13 +131,87 @@ def update_profile(user_id):
                 'last_name': updated_user['last_name'],
                 'first_name': updated_user['first_name'],
                 'email': updated_user['email'],
-                'department': updated_user['department'],
+                'department': updated_user.get('department', ''),
                 'skills': skills_list,
-                'photo': updated_user['photo'],
+                'photo': updated_user.get('photo', ''),
                 'role': updated_user['role']
             }
         }), 200
+
     return jsonify({'error': 'Failed to update user'}), 500
+@admin_bp.route('/admin/users/<int:user_id>', methods=['PUT'])
+@login_required(role='admin')
+def update_user_profile(user_id):
+    """Update a user's details, including their role."""
+    user = user_manager.get_user_by_id(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No update data provided'}), 400
+
+    skills_data = data.get('skills')
+    skills = None
+    if skills_data is not None:
+        if isinstance(skills_data, list):
+            skills = skills_data
+        else:
+            skills = [skill.strip() for skill in skills_data.split(',') if skill.strip()]
+
+    update_payload = {}
+    if data.get('last_name') is not None:
+        update_payload['last_name'] = data['last_name']
+    if data.get('first_name') is not None:
+        update_payload['first_name'] = data['first_name']
+    if data.get('department') is not None:
+        update_payload['department'] = data['department']
+    if skills is not None:
+        update_payload['skills'] = skills
+    if data.get('photo') is not None:
+        update_payload['photo'] = data['photo']
+    if data.get('role') in ['user', 'admin']:
+        update_payload['role'] = data['role']
+    if data.get('email') is not None:
+        update_payload['email'] = data['email']
+    if data.get('password') is not None:
+        update_payload['password'] = data['password']
+
+    if not update_payload:
+        return jsonify({'error': 'No valid fields provided for update'}), 400
+
+    success = user_manager.update_user(user_id, **update_payload)
+    if success:
+        log_admin_action(session['user_id'], 'update_user', 'user', user_id, f"Updated fields: {list(update_payload.keys())}")
+
+        updated_user = user_manager.get_user_by_id(user_id)
+        updated_user = dict(updated_user)  # 🔥 حل المشكلة هنا: تحويل الـ Row إلى dict
+        
+        # Handle 'skills' field safely
+        skills_value = updated_user.get('skills')
+        if isinstance(skills_value, list):
+            skills_list = skills_value
+        elif isinstance(skills_value, str) and skills_value:
+            skills_list = [skill.strip() for skill in skills_value.split(',') if skill.strip()]
+        else:
+            skills_list = []
+
+        return jsonify({
+            'message': 'User updated successfully',
+            'user': {
+                'id': updated_user['id'],
+                'last_name': updated_user['last_name'],
+                'first_name': updated_user['first_name'],
+                'email': updated_user['email'],
+                'department': updated_user.get('department', ''),
+                'skills': skills_list,
+                'photo': updated_user.get('photo', ''),
+                'role': updated_user['role']
+            }
+        }), 200
+
+    return jsonify({'error': 'Failed to update user'}), 500
+
 
 @admin_bp.route('/admin/users/<int:user_id>', methods=['DELETE'])
 @login_required(role='admin')  # Restrict to admins only

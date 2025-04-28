@@ -147,3 +147,34 @@ class PostManager(Database):
         except sqlite3.Error as e:
             logging.error(f"Database error retrieving all posts: {e}")
             return [], 0
+        
+    def get_posts_by_users(self, user_ids, page=1, per_page=10):
+        """Retrieves posts by multiple users (admins) with pagination."""
+        try:
+            with self.get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Count the total number of posts by the given user_ids
+                cursor.execute('''
+                    SELECT COUNT(*) as total FROM posts 
+                    WHERE user_id IN ({})
+                '''.format(','.join(['?'] * len(user_ids))), tuple(user_ids))
+                total = cursor.fetchone()[0]
+
+                # Get posts for the given user_ids with pagination
+                cursor.execute(''' 
+                    SELECT p.id, p.title, p.content, p.image, p.created_at, p.user_id,
+                           u.first_name, u.last_name, u.photo
+                    FROM posts p
+                    JOIN users u ON p.user_id = u.id
+                    WHERE p.user_id IN ({})
+                    ORDER BY p.created_at DESC
+                    LIMIT ? OFFSET ?
+                '''.format(','.join(['?'] * len(user_ids))), tuple(user_ids) + (per_page, (page - 1) * per_page))
+
+                posts = cursor.fetchall()
+                logging.info(f"Retrieved {len(posts)} posts for admins.")
+                return posts, total
+        except sqlite3.Error as e:
+            logging.error(f"Database error getting posts for users {user_ids}: {e}")
+            return [], 0

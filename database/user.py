@@ -177,3 +177,15 @@ class UserManager(Database):
         except sqlite3.Error as e:
             logging.error(f"Database error retrieving all users: {e}")
             return [], 0
+        
+    def get_admin_ids(self):
+        """Retrieves the IDs of all users with the 'admin' role."""
+        try:
+            with self.get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT id FROM users WHERE role = ?', ('admin',))
+                admin_ids = cursor.fetchall()
+                return [admin[0] for admin in admin_ids]
+        except sqlite3.Error as e:
+            logging.error(f"Database error retrieving admin IDs: {e}")
+            return []
