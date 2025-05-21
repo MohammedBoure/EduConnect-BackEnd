@@ -126,7 +126,7 @@ class PostManager(Database):
             return False
 
     def get_all_posts(self, page=1, per_page=10):
-        """Retrieves all posts with pagination."""
+        """Retrieves all posts with a truncated content (first 100 characters) and pagination."""
         try:
             with self.get_db_connection() as conn:
                 cursor = conn.cursor()
@@ -134,8 +134,9 @@ class PostManager(Database):
                 total = cursor.fetchone()[0]
                 
                 cursor.execute(''' 
-                    SELECT p.id, p.title, p.content, p.image, p.created_at, p.user_id,
-                           u.first_name, u.last_name, u.photo
+                    SELECT p.id, p.title, SUBSTR(p.content, 1, 100) as content, 
+                        p.image, p.created_at, p.user_id,
+                        u.first_name, u.last_name, u.photo
                     FROM posts p
                     JOIN users u ON p.user_id = u.id
                     ORDER BY p.created_at DESC
@@ -147,24 +148,25 @@ class PostManager(Database):
         except sqlite3.Error as e:
             logging.error(f"Database error retrieving all posts: {e}")
             return [], 0
-        
+   
     def get_posts_by_users(self, user_ids, page=1, per_page=10):
-        """Retrieves posts by multiple users (admins) with pagination."""
+        """Retrieves posts by multiple users (admins) with truncated content and pagination."""
         try:
             with self.get_db_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Count the total number of posts by the given user_ids
+                # Count total posts by the given user_ids
                 cursor.execute('''
                     SELECT COUNT(*) as total FROM posts 
                     WHERE user_id IN ({})
                 '''.format(','.join(['?'] * len(user_ids))), tuple(user_ids))
                 total = cursor.fetchone()[0]
 
-                # Get posts for the given user_ids with pagination
+                # Get paginated posts with content truncated to 100 characters
                 cursor.execute(''' 
-                    SELECT p.id, p.title, p.content, p.image, p.created_at, p.user_id,
-                           u.first_name, u.last_name, u.photo
+                    SELECT p.id, p.title, SUBSTR(p.content, 1, 101) as content, 
+                        p.image, p.created_at, p.user_id,
+                        u.first_name, u.last_name, u.photo
                     FROM posts p
                     JOIN users u ON p.user_id = u.id
                     WHERE p.user_id IN ({})

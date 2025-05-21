@@ -153,6 +153,7 @@ def get_admin_user_posts():
     
     # Get posts for admins only
     posts, total = post_manager.get_posts_by_users(admin_ids, page, per_page)
+    
 
     post_list = []
     for p in posts:
@@ -179,7 +180,44 @@ def get_admin_user_posts():
         'per_page': per_page
     }), 200
 
-@posts_bp.route('/posts', methods=['GET'])
+@posts_bp.route('/posts/users_posts', methods=['GET','OPTIONS'])
+def get_all_posts_users():
+    print("Fetching user posts------------------------------------")
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    
+    user_ids = user_manager.get_users_ids()  # Get admin IDs from the database --> (1, 2, 3, ...)
+    
+    # Get posts for admins only
+    posts, total = post_manager.get_posts_by_users(user_ids, page, per_page)
+    
+
+    post_list = []
+    for p in posts:
+        post_dict = {
+            'id': p[0],
+            'title': p[1],
+            'content': p[2],
+            'image': p[3],
+            'created_at': p[4].isoformat() + "Z" if isinstance(p[4], datetime.datetime) else str(p[4]),
+            'user_id': p[5],
+            'author': {
+                'first_name': p[6],
+                'last_name': p[7],
+                'photo': p[8]
+            }
+        }
+        post_list.append(post_dict)
+
+    return jsonify({
+        'posts': post_list,
+        'total': total,
+        'page': page,
+        'pages': (total + per_page - 1) // per_page if per_page > 0 else 0,
+        'per_page': per_page
+    }), 200
+
+@posts_bp.route('/posts', methods=['GET','OPTIONS'])
 def get_all_posts():
     """Retrieve all posts (publicly accessible)."""
     page = request.args.get('page', 1, type=int)
@@ -259,7 +297,7 @@ def update_post(post_id):
     return jsonify({'error': 'Failed to update post'}), 500
 
 @posts_bp.route('/posts/<int:post_id>', methods=['DELETE'])
-@login_required(role='admin')
+@login_required()
 def delete_post(post_id):
     """Delete a post by ID (admin only)."""
     current_user_id = session.get('user_id')
