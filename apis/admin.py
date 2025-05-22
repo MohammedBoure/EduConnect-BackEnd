@@ -18,6 +18,7 @@ def log_admin_action(admin_id, action, resource_type, resource_id, details=None)
 # --- Admin User Management ---
 
 @admin_bp.route('/admin/users', methods=['GET','OPTIONS'])
+@login_required(role='admin')
 def list_users():
     """Retrieve a paginated list of all users."""
     page = request.args.get('page', 1, type=int)
@@ -44,6 +45,7 @@ def list_users():
     }), 200
 
 @admin_bp.route('/admin/users/<int:user_id>', methods=['GET', 'OPTIONS'])
+@login_required(role='admin')
 def get_profile(user_id):
     """Retrieve details of a specific user by ID."""
     if request.method == 'OPTIONS':
@@ -67,7 +69,7 @@ def get_profile(user_id):
         'role': user['role']
     }), 200
 
-@admin_bp.route('/admin/users/<int:user_id>', methods=['PUT'])
+@admin_bp.route('/admin/users/<int:user_id>', methods=['PUT','OPTIONS'])
 @login_required(role='admin')
 def update_profile(user_id):
     """Update a user's details, including their role."""
@@ -111,6 +113,11 @@ def update_profile(user_id):
     success = user_manager.update_user(user_id, **update_payload)
     if success:
         log_admin_action(session['user_id'], 'update_user', 'user', user_id, f"Updated fields: {list(update_payload.keys())}")
+        
+        # Clear session if the user updated their own role
+        if user_id == session['user_id'] and 'role' in update_payload and update_payload['role'] != session['role']:
+            session.clear()
+            return jsonify({'message': 'User updated successfully, please log in again due to role change'}), 200
 
         updated_user = user_manager.get_user_by_id(user_id)
         updated_user = dict(updated_user)  # 🔥 حل المشكلة هنا: تحويل الـ Row إلى dict
@@ -139,7 +146,8 @@ def update_profile(user_id):
         }), 200
 
     return jsonify({'error': 'Failed to update user'}), 500
-@admin_bp.route('/admin/users/<int:user_id>', methods=['PUT'])
+
+@admin_bp.route('/admin/users/<int:user_id>', methods=['PUT','OPTIONS'])
 @login_required(role='admin')
 def update_user_profile(user_id):
     """Update a user's details, including their role."""
@@ -213,7 +221,7 @@ def update_user_profile(user_id):
     return jsonify({'error': 'Failed to update user'}), 500
 
 
-@admin_bp.route('/admin/users/<int:user_id>', methods=['DELETE'])
+@admin_bp.route('/admin/users/<int:user_id>', methods=['DELETE','OPTIONS'])
 @login_required(role='admin')  # Restrict to admins only
 def delete_user(user_id):
     """Delete a user by ID."""
@@ -225,7 +233,7 @@ def delete_user(user_id):
     return jsonify({'error': 'Failed to delete user'}), 500
 
 # --- Admin Post Management ---
-@admin_bp.route('/admin/posts/create', methods=['POST'])
+@admin_bp.route('/admin/posts/create', methods=['POST','OPTIONS'])
 @login_required(role='admin')
 def create_post():
     """Create a new post on behalf of a user."""
@@ -303,7 +311,7 @@ def list_posts():
         'per_page': per_page
     }), 200
     
-@admin_bp.route('/admin/posts/<int:post_id>', methods=['PUT'])
+@admin_bp.route('/admin/posts/<int:post_id>', methods=['PUT','OPTIONS'])
 @login_required(role='admin')
 def update_post(post_id):
     """Update an existing post."""
@@ -338,7 +346,7 @@ def update_post(post_id):
         return jsonify({'message': 'Post updated successfully', 'post': post_data}), 200
     return jsonify({'error': 'Failed to update post'}), 500
 
-@admin_bp.route('/admin/posts/<int:post_id>', methods=['DELETE'])
+@admin_bp.route('/admin/posts/<int:post_id>', methods=['DELETE','OPTIONS'])
 @login_required(role='admin')
 def delete_post(post_id):
     """Delete a post by ID."""
@@ -349,7 +357,7 @@ def delete_post(post_id):
         return jsonify({'message': 'Post deleted successfully'}), 200
     return jsonify({'error': 'Failed to delete post'}), 500
 # --- Admin Comment Management ---
-@admin_bp.route('/admin/posts/<int:post_id>/comments', methods=['POST'])
+@admin_bp.route('/admin/posts/<int:post_id>/comments', methods=['POST','OPTIONS'])
 @login_required(role='admin')
 def add_comment(post_id):
     """Add a comment to a post."""
@@ -394,6 +402,7 @@ def add_comment(post_id):
         return jsonify({'error': str(e)}), 500
     
 @admin_bp.route('/admin/comments', methods=['GET','OPTIONS'])
+@login_required(role='admin')
 def list_comments():
     """Retrieve a paginated list of all comments."""
     page = request.args.get('page', 1, type=int)
@@ -421,7 +430,7 @@ def list_comments():
         'per_page': per_page
     }), 200
 
-@admin_bp.route('/admin/comments/<int:comment_id>', methods=['PUT'])
+@admin_bp.route('/admin/comments/<int:comment_id>', methods=['PUT','OPTIONS'])
 @login_required(role='admin')
 def update_comment(comment_id):
     """Update an existing comment."""
@@ -485,6 +494,7 @@ def delete_comment(comment_id):
 # --- Admin Message Management ---
 
 @admin_bp.route('/admin/messages', methods=['GET','OPTIONS'])
+@login_required(role='admin')
 def list_messages():
     """Retrieve a paginated list of all messages."""
     page = request.args.get('page', 1, type=int)
@@ -507,7 +517,7 @@ def list_messages():
         'per_page': per_page
     }), 200
 
-@admin_bp.route('/admin/messages/<int:message_id>', methods=['DELETE'])
+@admin_bp.route('/admin/messages/<int:message_id>', methods=['DELETE','OPTIONS'])
 @login_required(role='admin')
 def delete_message(message_id):
     """Delete a message by ID."""
@@ -518,7 +528,7 @@ def delete_message(message_id):
         return jsonify({'message': 'Message deleted successfully'}), 200
     return jsonify({'error': 'Failed to delete message'}), 500
 
-@admin_bp.route('/admin/messages', methods=['POST'])
+@admin_bp.route('/admin/messages', methods=['POST','OPTIONS'])
 @login_required(role='admin')
 def send_message():
     """Send a new message from one user to another."""
@@ -565,7 +575,7 @@ def send_message():
 
     return jsonify({'error': 'Failed to send message'}), 500
 
-@admin_bp.route('/admin/messages/<int:current_user_id>/<int:other_user_id>', methods=['GET']) 
+@admin_bp.route('/admin/messages/<int:current_user_id>/<int:other_user_id>', methods=['GET','OPTIONS']) 
 @login_required(role='admin')
 def get_messages(current_user_id, other_user_id):
     # التحقق من وجود المستخدم الآخر

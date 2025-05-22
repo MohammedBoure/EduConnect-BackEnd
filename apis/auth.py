@@ -9,13 +9,27 @@ user_manager = UserManager()
 
 def login_required(role=None):
     def decorator(f):
-        from functools import wraps
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            if 'user_id' not in session or 'role' not in session:
+            # السماح بمرور طلب OPTIONS بدون التحقق من الجلسة
+            if request.method == 'OPTIONS':
+                return '', 200
+
+            if 'user_id' not in session:
                 return jsonify({'error': 'Unauthorized: No active session'}), 401
-            if role and session['role'] != role:
+
+            user = user_manager.get_user_by_id(session['user_id'])
+            if not user:
+                session.clear()
+                return jsonify({'error': 'Unauthorized: User not found'}), 401
+
+            if session.get('role') != user['role']:
+                session.clear()
+                return jsonify({'error': 'Session invalid due to role change, please log in again'}), 401
+
+            if role and user['role'] != role:
                 return jsonify({'error': f'Forbidden: Requires {role} role'}), 403
+
             return f(*args, **kwargs)
         return decorated_function
     return decorator

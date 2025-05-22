@@ -8,6 +8,19 @@ https://educonnect-admin.onrender.com
 ## Overview
 The EduConnect API is a RESTful interface built using the Flask framework, designed for a social platform managing users, profiles, posts, comments, messages, and administrative tasks. It uses **session-based authentication** and relies on an SQLite database (`student_directory.db`) for data storage. The API supports user registration, login, profile management, messaging, posts, comments, and administrative operations.
 
+## Admin Access
+To access the admin interface, use the following link:
+- **Admin Interface**: [https://educonnect-admin.onrender.com/admin.html](https://educonnect-admin.onrender.com/admin.html)
+
+### Test Accounts
+The following accounts can be used for testing the API and admin interface (all accounts share the same password **11111111**): 
+- **Carlos@gmail.com**
+- **Chloe@gmail.com**
+- **Liam@gmail.com**
+- **Rajesh@gmail.com**
+- **admin@gmail.com**  
+  **Note**: The `admin@gmail.com` account is designated for admin access and is required to log in to the admin interface.
+
 ## API Documentation
 **For Developers**: The detailed documentation is designed to serve as a primary reference for front-end development. You can find all details about endpoints, request types, and response examples in the following documentation files within the `docs-APIs/` directory, available in both English (`en/`) and Arabic (`ar/`) versions:
 
@@ -99,7 +112,7 @@ The EduConnect API is a RESTful interface built using the Flask framework, desig
 4. Access the API at `http://127.0.0.1:5000` or the deployed URL.
 
 ## Testing
-Use tools like **Postman**, **cURL**, or custom scripts to test the API. Refer to the documentation in `docs-APIs/` for details on endpoints, request formats, and response examples.
+Use tools like **Postman**, **cURL**, or custom scripts to test the API. Refer to the documentation in `docs-APIs/` for details on endpoints, request formats, and response examples. Use the provided test accounts for authentication and admin access.
 
 ## Security
 - Use HTTPS in production to protect sensitive data.
