@@ -1,4 +1,1 @@
-feat: add initial setup files and set initial version
-
-- Added the following files: commit_msg, commit_msgs, git_push.sh, LICENSE, .gitignore, CHANGELOG.md  
-- Set the initial version of the program in CHANGELOG.md
+Add image upload support to user registration, profile update, and post creation/editing (modified auth.py and posts.py)

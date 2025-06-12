@@ -1,8 +1,15 @@
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify, session, url_for
 from .auth import login_required
+from werkzeug.utils import secure_filename
+import os
+import re
 from database import UserManager,AuditLogManager
 
 profile_bp = Blueprint('profile', __name__)
+
+# Configure upload folder and allowed extensions
+UPLOAD_FOLDER = 'static/uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 user_manager = UserManager()
 audit_log_manager = AuditLogManager()
@@ -50,11 +57,19 @@ def serialize_user(user):
         'role': user['role']
     }
 
-# Route to update user profile
+
+# Ensure the upload folder exists
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+def allowed_file(filename):
+    """Check if the file extension is allowed."""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 @profile_bp.route('/profile/<int:user_id>', methods=['PUT'])
 @login_required()  # Restrict to authenticated users
 def update_profile(user_id):
-    """Update a user's own profile details."""
+    """Update a user's own profile details, including photo via upload or URL."""
     current_user_id = int(session['user_id'])
     if current_user_id != user_id:
         return jsonify({'error': 'Unauthorized: You can only update your own profile'}), 403
@@ -63,23 +78,49 @@ def update_profile(user_id):
     if not user:
         return jsonify({'error': 'User not found'}), 404
 
-    data = request.get_json()
-    if not data:
+    # Handle form-data or JSON
+    data = request.form.to_dict() if request.form else request.get_json() or {}
+    if not data and not request.files:
         return jsonify({'error': 'No update data provided'}), 400
 
+    # Process skills
     skills_data = data.get('skills')
     skills = None
     if skills_data is not None:
         skills = skills_data if isinstance(skills_data, list) else [skill.strip() for skill in skills_data.split(',') if skill.strip()]
 
+    # Initialize update payload
     update_payload = {}
     if data.get('last_name') is not None: update_payload['last_name'] = data['last_name']
     if data.get('first_name') is not None: update_payload['first_name'] = data['first_name']
     if data.get('department') is not None: update_payload['department'] = data['department']
     if skills is not None: update_payload['skills'] = skills
-    if data.get('photo') is not None: update_payload['photo'] = data['photo']
     if data.get('email') is not None: update_payload['email'] = data['email']
     if data.get('password') is not None: update_payload['password'] = data['password']
+
+    # Handle photo: prioritize uploaded file, then photo_url
+    photo_url = None
+    file_path = None
+    if 'photo' in request.files and request.files['photo'].filename:
+        file = request.files['photo']
+        if allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            unique_filename = f"{data.get('email', user['email']).split('@')[0]}_{filename}"
+            file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+            file.save(file_path)
+            photo_url = url_for('static', filename=f'uploads/{unique_filename}', _external=True)
+        else:
+            return jsonify({'error': 'Invalid or unsupported file type'}), 400
+    elif 'photo_url' in data and data['photo_url']:
+        # Accept Base64 data URLs or any HTTP/HTTPS URL
+        photo_url_pattern = r'^(data:image/(png|jpeg|gif);base64,|https?:\/\/.*)$'
+        if not re.match(photo_url_pattern, data['photo_url'], re.IGNORECASE):
+            return jsonify({'error': 'Invalid photo URL format'}), 400
+        photo_url = data['photo_url']
+
+    # Add photo to update payload if provided
+    if photo_url is not None:
+        update_payload['photo'] = photo_url
 
     # Ignore 'role' to prevent privilege escalation
     if 'role' in data:
@@ -103,6 +144,9 @@ def update_profile(user_id):
             'user': serialized_user
         }), 200
 
+    # Clean up uploaded file if update fails
+    if file_path and os.path.exists(file_path):
+        os.remove(file_path)
     return jsonify({'error': 'Failed to update user'}), 500
 
 
