@@ -19,95 +19,132 @@
 ### 1. إنشاء منشور
 - **الطريقة**: `POST`
 - **الرابط**: `/posts`
-- **الوصف**: إنشاء منشور جديد للمستخدم المصادق عليه.
-- **المصادقة**: مطلوبة (جلسة مستخدم نشطة).
+- **الوصف**: إنشاء منشور جديد للمستخدم المصادق عليه مع صورة اختيارية (إما كملف مرفوع أو رابط URL).
+- **المصادقة**: مطلوبة (جلسة مستخدم نشطة عبر `login_required`).
 
-#### جسم الطلب
-| الحقل       | النوع  | الوصف         | ملاحظات               |
-| ----------- | ------ | ------------- | --------------------- |
-| `title` *   | String | عنوان المنشور | لا يمكن أن يكون فارغًا |
-| `content` * | String | محتوى المنشور | لا يمكن أن يكون فارغًا |
-| `image`     | String | رابط الصورة   | اختياري               |
+### الطلب
+- **نوع المحتوى**: 
+  - `application/json` للبيانات بصيغة JSON.
+  - `multipart/form-data` لرفع الملفات مع حقول النموذج.
+- **الجسم**:
+  | الحقل       | النوع  | الوصف                           | ملاحظات                              |
+  |-------------|--------|---------------------------------|--------------------------------------|
+  | `title` *   | نص     | عنوان المنشور                  | مطلوب، لا يمكن أن يكون فارغًا أو يحتوي على مسافات فقط |
+  | `content` * | نص     | محتوى المنشور                  | مطلوب، لا يمكن أن يكون فارغًا أو يحتوي على مسافات فقط |
+  | `image`     | ملف    | ملف الصورة                      | اختياري، يجب أن يكون نوع ملف مدعوم (مثل `.jpg`، `.png`) إذا تم توفيره |
+  | `image_url` | نص     | رابط الصورة                     | اختياري، يجب أن يبدأ بـ `http://` أو `https://` إذا تم توفيره |
 
-**مثال**:
+  **ملاحظات**:
+  - إذا تم توفير كل من `image` (ملف) و`image_url`، يتم تفضيل الملف المرفوع.
+  - أنواع الملفات المدعومة لـ `image` يتم تحديدها من قبل الخادم (مثل `.jpg`، `.png`، `.gif`).
+
+**مثال (JSON)**:
 ```json
 {
-  "title": "New Project Announcement",
-  "content": "We are excited to announce a new project...",
-  "image": "https://example.com/images/project.jpg"
+  "title": "إعلان مشروع جديد",
+  "content": "نحن متحمسون للإعلان عن مشروع جديد...",
+  "image_url": "https://example.com/images/project.jpg"
 }
 ```
 
-#### الاستجابات
-- **201 Created**:
+**مثال (Form-Data)**:
+```
+title: إعلان مشروع جديد
+content: نحن متحمسون للإعلان عن مشروع جديد...
+image: (ملف ثنائي، مثل project.jpg)
+```
+
+### الردود
+- **201 تم الإنشاء**:
   ```json
   {
-    "message": "Post created successfully",
+    "message": "تم إنشاء المنشور بنجاح",
     "post": {
       "id": 1,
-      "title": "New Project Announcement",
-      "content": "We are excited to announce a new project...",
-      "image": "https://example.com/images/project.jpg",
+      "title": "إعلان مشروع جديد",
+      "content": "نحن متحمسون للإعلان عن مشروع جديد...",
+      "image": "https://educonnect-wp9t.onrender.com/static/uploads_posts/1_1697051234.567_project.jpg",
       "created_at": "2025-05-22T07:28:00Z",
       "user_id": 1,
       "author": {
-        "first_name": "Ahmed",
-        "last_name": "Benali",
+        "first_name": "أحمد",
+        "last_name": "بنعلي",
         "photo": "https://example.com/photos/ahmed.jpg"
       }
     }
   }
   ```
-- **400 Bad Request**:
+- **400 طلب غير صالح** (بيانات طلب غير صالحة):
   ```json
-  {"error": "Invalid request data"}
+  {"error": "بيانات الطلب غير صالحة"}
   ```
-- **400 Bad Request**:
+- **400 طلب غير صالح** (عنوان أو محتوى فارغ):
   ```json
-  {"error": "Title and content cannot be empty"}
+  {"error": "العنوان والمحتوى لا يمكن أن يكونا فارغين"}
   ```
-- **401 Unauthorized**:
+- **400 طلب غير صالح** (نوع ملف غير صالح):
   ```json
-  {"error": "Unauthorized: No active session"}
+  {"error": "نوع ملف غير صالح أو غير مدعوم للصورة"}
   ```
-- **500 Internal Server Error**:
+- **400 طلب غير صالح** (رابط صورة غير صالح):
   ```json
-  {"error": "Failed to create post"}
+  {"error": "رابط الصورة غير صالح"}
+  ```
+- **401 غير مصرح**:
+  ```json
+  {"error": "غير مصرح: لا توجد جلسة نشطة"}
+  ```
+- **500 خطأ داخلي في الخادم**:
+  ```json
+  {"error": "فشل في إنشاء المنشور"}
   ```
 
-#### مثال JavaScript (Frontend):
+### مثال JavaScript (واجهة المستخدم)
 ```javascript
-async function createPost(postData) {
+async function createPost(postData, imageFile = null) {
   try {
+    const formData = new FormData();
+    formData.append('title', postData.title);
+    formData.append('content', postData.content);
+    if (imageFile) {
+      formData.append('image', imageFile);
+    } else if (postData.image_url) {
+      formData.append('image_url', postData.image_url);
+    }
+
     const response = await fetch('https://educonnect-wp9t.onrender.com/posts', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(postData),
+      body: formData,
       credentials: 'include'
     });
 
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to create post');
+      throw new Error(data.error || 'فشل في إنشاء المنشور');
     }
-    console.log('Post created successfully:', data);
+    console.log('تم إنشاء المنشور بنجاح:', data);
     return data;
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('خطأ:', error.message);
     throw error;
   }
 }
 
-// استخدام الدالة
+// الاستخدام
 const postData = {
-  title: 'New Project Announcement',
-  content: 'We are excited to announce a new project...',
-  image: 'https://example.com/images/project.jpg'
+  title: 'إعلان مشروع جديد',
+  content: 'نحن متحمسون للإعلان عن مشروع جديد...',
+  image_url: 'https://example.com/images/project.jpg'
 };
 
+// مثال برابط صورة
 createPost(postData)
+  .then(data => console.log(data))
+  .catch(error => console.error(error));
+
+// مثال بملف صورة
+const imageFile = document.querySelector('#imageInput').files[0];
+createPost({ title: postData.title, content: postData.content }, imageFile)
   .then(data => console.log(data))
   .catch(error => console.error(error));
 ```
@@ -451,103 +488,147 @@ getAllPosts(1, 10)
 ### 7. تحديث منشور
 - **الطريقة**: `PUT`
 - **الرابط**: `/posts/<post_id>`
-- **الوصف**: تحديث منشور موجود (لصاحب المنشور أو الإداريين فقط).
-- **المصادقة**: مطلوبة (جلسة مستخدم نشطة).
+- **الوصف**: تحديث منشور موجود (لصاحب المنشور أو المسؤولين فقط).
+- **المصادقة**: مطلوبة (جلسة مستخدم نشطة عبر `login_required`).
 
-#### جسم الطلب
-| الحقل       | النوع  | الوصف         | ملاحظات               |
-| ----------- | ------ | ------------- | --------------------- |
-| `title` *   | String | عنوان المنشور | لا يمكن أن يكون فارغًا |
-| `content` * | String | محتوى المنشور | لا يمكن أن يكون فارغًا |
-| `image`     | String | رابط الصورة   | اختياري               |
+### الطلب
+- **نوع المحتوى**: 
+  - `application/json` للبيانات بصيغة JSON.
+  - `multipart/form-data` لرفع الملفات مع حقول النموذج.
+- **الجسم**:
+  | الحقل       | النوع  | الوصف                           | ملاحظات                              |
+  |-------------|--------|---------------------------------|--------------------------------------|
+  | `title` *   | نص     | عنوان المنشور                  | مطلوب، لا يمكن أن يكون فارغًا أو يحتوي على مسافات فقط |
+  | `content` * | نص     | محتوى المنشور                  | مطلوب، لا يمكن أن يكون فارغًا أو يحتوي على مسافات فقط |
+  | `image`     | ملف    | ملف الصورة                      | اختياري، يجب أن يكون نوع ملف مدعوم (مثل `.jpg`، `.png`) إذا تم توفيره |
+  | `image_url` | نص     | رابط الصورة                     | اختياري، يجب أن يبدأ بـ `http://` أو `https://` إذا تم توفيره، أو فارغ لإزالة الصورة |
 
-**مثال**:
+  **ملاحظات**:
+  - إذا تم توفير كل من `image` (ملف) و`image_url`، يتم تفضيل الملف المرفوع.
+  - إذا لم يتم توفير صورة جديدة، يتم الاحتفاظ بالصورة الحالية.
+  - إرسال `image_url` فارغ (`""`) يزيل الصورة الموجودة.
+  - أنواع الملفات المدعومة لـ `image` يتم تحديدها من قبل الخادم (مثل `.jpg`، `.png`، `.gif`).
+
+**مثال (JSON)**:
 ```json
 {
-  "title": "Updated Project Announcement",
-  "content": "Updated content for the project announcement...",
-  "image": "https://example.com/images/updated_project.jpg"
+  "title": "إعلان مشروع محدث",
+  "content": "محتوى محدث لإعلان المشروع...",
+  "image_url": "https://example.com/images/updated_project.jpg"
 }
 ```
 
-#### الاستجابات
-- **200 OK**:
+**مثال (Form-Data)**:
+```
+title: إعلان مشروع محدث
+content: محتوى محدث لإعلان المشروع...
+image: (ملف ثنائي، مثل updated_project.jpg)
+```
+
+### الردود
+- **200 نجاح**:
   ```json
   {
-    "message": "Post updated successfully",
+    "message": "تم تحديث المنشور بنجاح",
     "post": {
       "id": 1,
-      "title": "Updated Project Announcement",
-      "content": "Updated content for the project announcement...",
-      "image": "https://example.com/images/updated_project.jpg",
+      "title": "إعلان مشروع محدث",
+      "content": "محتوى محدث لإعلان المشروع...",
+      "image": "https://educonnect-wp9t.onrender.com/static/uploads_posts/1_1697051234.567_updated_project.jpg",
       "created_at": "2025-05-22T07:28:00Z",
       "user_id": 1,
       "author": {
-        "first_name": "Ahmed",
-        "last_name": "Benali",
+        "first_name": "أحمد",
+        "last_name": "بنعلي",
         "photo": "https://example.com/photos/ahmed.jpg"
       }
     }
   }
   ```
-- **400 Bad Request**:
+- **400 طلب غير صالح** (بيانات طلب غير صالحة):
   ```json
-  {"error": "Invalid request data"}
+  {"error": "بيانات الطلب غير صالحة"}
   ```
-- **400 Bad Request**:
+- **400 طلب غير صالح** (عنوان أو محتوى فارغ):
   ```json
-  {"error": "Title and content cannot be empty"}
+  {"error": "العنوان والمحتوى لا يمكن أن يكونا فارغين"}
   ```
-- **401 Unauthorized**:
+- **400 طلب غير صالح** (نوع ملف غير صالح):
   ```json
-  {"error": "Unauthorized: No active session"}
+  {"error": "نوع ملف غير صالح أو غير مدعوم للصورة"}
   ```
-- **403 Forbidden**:
+- **400 طلب غير صالح** (رابط صورة غير صالح):
   ```json
-  {"error": "Forbidden: You can only update your own posts"}
+  {"error": "رابط الصورة غير صالح"}
   ```
-- **404 Not Found**:
+- **401 غير مصرح**:
   ```json
-  {"error": "Post not found"}
+  {"error": "غير مصرح: لا توجد جلسة نشطة"}
   ```
-- **500 Internal Server Error**:
+- **403 ممنوع**:
   ```json
-  {"error": "Failed to update post"}
+  {"error": "ممنوع: يمكنك تحديث منشوراتك فقط"}
+  ```
+- **404 غير موجود**:
+  ```json
+  {"error": "المنشور غير موجود"}
+  ```
+- **500 خطأ داخلي في الخادم**:
+  ```json
+  {"error": "فشل في تحديث المنشور"}
   ```
 
-#### مثال JavaScript (Frontend):
+### مثال JavaScript (واجهة المستخدم)
 ```javascript
-async function updatePost(postId, postData) {
+async function updatePost(postId, postData, imageFile = null) {
   try {
+    const formData = new FormData();
+    formData.append('title', postData.title);
+    formData.append('content', postData.content);
+    if (imageFile) {
+      formData.append('image', imageFile);
+    } else if (postData.image_url !== undefined) {
+      formData.append('image_url', postData.image_url);
+    }
+
     const response = await fetch(`https://educonnect-wp9t.onrender.com/posts/${postId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(postData),
+      body: formData,
       credentials: 'include'
     });
 
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to update post');
+      throw new Error(data.error || 'فشل في تحديث المنشور');
     }
-    console.log('Post updated successfully:', data);
+    console.log('تم تحديث المنشور بنجاح:', data);
     return data;
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('خطأ:', error.message);
     throw error;
   }
 }
 
-// استخدام الدالة
+// الاستخدام
 const postData = {
-  title: 'Updated Project Announcement',
-  content: 'Updated content for the project announcement...',
-  image: 'https://example.com/images/updated_project.jpg'
+  title: 'إعلان مشروع محدث',
+  content: 'محتوى محدث لإعلان المشروع...',
+  image_url: 'https://example.com/images/updated_project.jpg'
 };
 
+// مثال برابط صورة
 updatePost(1, postData)
+  .then(data => console.log(data))
+  .catch(error => console.error(error));
+
+// مثال بملف صورة
+const imageFile = document.querySelector('#imageInput').files[0];
+updatePost(1, { title: postData.title, content: postData.content }, imageFile)
+  .then(data => console.log(data))
+  .catch(error => console.error(error));
+
+// مثال لإزالة الصورة
+updatePost(1, { title: postData.title, content: postData.content, image_url: '' })
   .then(data => console.log(data))
   .catch(error => console.error(error));
 ```

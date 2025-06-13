@@ -16,24 +16,32 @@ The authentication APIs enable user registration, login using sessions, and logo
 
 ## Endpoints
 
-### 1. Register a New User
+### 1. # Register a New User
+
 - **Method**: `POST`
 - **URL**: `/api/register`
-- **Description**: Create a new user account.
+- **Description**: Create a new user account. Supports JSON or form-data requests. Users can provide a profile picture via file upload or a URL.
 - **Authentication**: Not required.
+- **Content-Type**: `application/json` or `multipart/form-data`
 
-#### Request Body
-| Field          | Type   | Description                     | Notes                     |
-| -------------- | ------ | ------------------------------- | ------------------------- |
-| `first_name` * | String | First name                      | Cannot be empty           |
-| `last_name` *  | String | Last name                       | Cannot be empty           |
-| `email` *      | String | Email address                   | Must be unique and valid  |
-| `password` *   | String | Password                        | At least 8 characters     |
-| `department` * | String | Department/Specialization       | Cannot be empty           |
-| `skills` *     | String | Skills                          | Comma-separated or as list|
-| `photo`        | String | Profile picture URL             | Optional                  |
+## Request Body
 
-**Example**:
+| Field          | Type   | Description                     | Notes                                                                 |
+| -------------- | ------ | ------------------------------- | --------------------------------------------------------------------- |
+| `first_name` * | String | First name                      | Cannot be empty                                                       |
+| `last_name` *  | String | Last name                       | Cannot be empty                                                       |
+| `email` *      | String | Email address                   | Must be unique and valid (format: `user@domain.tld`)                  |
+| `password` *   | String | Password                        | At least 8 characters                                                 |
+| `department` * | String | Department/Specialization       | Cannot be empty                                                       |
+| `skills` *     | String | Skills                          | Comma-separated string (e.g., `Python,JavaScript`)                     |
+| `photo`        | File   | Profile picture file            | Optional; supported types: PNG, JPG, JPEG (used with `multipart/form-data`) |
+| `photo_url`    | String | Profile picture URL             | Optional; must start with `http://` or `https://` (used with `application/json` or `multipart/form-data`) |
+
+**Notes**:
+- If both `photo` and `photo_url` are provided, the uploaded `photo` file takes precedence.
+- Required fields are marked with an asterisk (*).
+
+**Example (JSON)**:
 ```json
 {
   "first_name": "Ahmed",
@@ -41,12 +49,24 @@ The authentication APIs enable user registration, login using sessions, and logo
   "email": "ahmed.benali@example.com",
   "password": "securepassword123",
   "department": "Computer Science",
-  "skills": "Python, JavaScript",
-  "photo": "https://example.com/photos/ahmed.jpg"
+  "skills": "Python,JavaScript",
+  "photo_url": "https://example.com/photos/ahmed.jpg"
 }
 ```
 
-#### Responses
+**Example (Form-data)**:
+```
+first_name: Ahmed
+last_name: Benali
+email: ahmed.benali@example.com
+password: securepassword123
+department: Computer Science
+skills: Python,JavaScript
+photo: (binary file, e.g., ahmed.jpg)
+```
+
+## Responses
+
 - **201 Created**:
   ```json
   {
@@ -57,49 +77,78 @@ The authentication APIs enable user registration, login using sessions, and logo
       "last_name": "Benali",
       "email": "ahmed.benali@example.com",
       "department": "Computer Science",
-      "photo": "https://example.com/photos/ahmed.jpg",
+      "photo": "https://example.com/static/uploads/ahmed_benali_ahmed.jpg",
       "role": "user"
     }
   }
   ```
-- **400 Bad Request**:
+
+- **400 Bad Request** (Missing required fields):
   ```json
   {"error": "Missing required fields"}
   ```
-- **400 Bad Request**:
+
+- **400 Bad Request** (Invalid email format):
   ```json
   {"error": "Invalid email format"}
   ```
-- **400 Bad Request**:
+
+- **400 Bad Request** (Password too short):
   ```json
   {"error": "Password must be at least 8 characters"}
   ```
-- **400 Bad Request**:
+
+- **400 Bad Request** (Email already registered):
   ```json
   {"error": "Email already registered"}
   ```
+
+- **400 Bad Request** (Invalid or unsupported file type for photo):
+  ```json
+  {"error": "Invalid or unsupported file type"}
+  ```
+
+- **400 Bad Request** (Invalid photo URL):
+  ```json
+  {"error": "Invalid photo URL"}
+  ```
+
 - **500 Internal Server Error**:
   ```json
   {"error": "Failed to register user"}
   ```
 
-#### Example JavaScript (Frontend):
-```javascript
-async function registerUser(userData) {
-  try {
-    const response = await fetch('https://educonnect-wp9t.onrender.com/api/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(userData),
-      credentials: 'include' // Required to send session cookies
-    });
+## Example JavaScript (Frontend)
 
+```javascript
+async function registerUser(userData, isFormData = false) {
+  try {
+    const url = 'https://educonnect-wp9t.onrender.com/api/register';
+    let options = {
+      method: 'POST',
+      credentials: 'include' // Required to send session cookies
+    };
+
+    if (isFormData) {
+      // For form-data (e.g., with file upload)
+      const formData = new FormData();
+      for (const key in userData) {
+        formData.append(key, userData[key]);
+      }
+      options.body = formData;
+    } else {
+      // For JSON
+      options.headers = { 'Content-Type': 'application/json' };
+      options.body = JSON.stringify(userData);
+    }
+
+    const response = await fetch(url, options);
     const data = await response.json();
+
     if (!response.ok) {
       throw new Error(data.error || 'Registration failed');
     }
+
     console.log('Registration successful:', data);
     return data;
   } catch (error) {
@@ -108,18 +157,33 @@ async function registerUser(userData) {
   }
 }
 
-// Usage
-const userData = {
+// Usage with JSON
+const userDataJson = {
   first_name: 'Ahmed',
   last_name: 'Benali',
   email: 'ahmed.benali@example.com',
   password: 'securepassword123',
   department: 'Computer Science',
-  skills: 'Python, JavaScript',
-  photo: 'https://example.com/photos/ahmed.jpg'
+  skills: 'Python,JavaScript',
+  photo_url: 'https://example.com/photos/ahmed.jpg'
 };
 
-registerUser(userData)
+registerUser(userDataJson)
+  .then(data => console.log(data))
+  .catch(error => console.error(error));
+
+// Usage with Form-data (e.g., with file upload)
+const userDataForm = {
+  first_name: 'Ahmed',
+  last_name: 'Benali',
+  email: 'ahmed.benali@example.com',
+  password: 'securepassword123',
+  department: 'Computer Science',
+  skills: 'Python,JavaScript',
+  photo: document.querySelector('input[type="file"]').files[0] // Example file input
+};
+
+registerUser(userDataForm, true)
   .then(data => console.log(data))
   .catch(error => console.error(error));
 ```

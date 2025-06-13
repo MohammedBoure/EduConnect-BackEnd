@@ -76,99 +76,156 @@ getUserProfile(userId)
 ```
 
 ### 2. Update User Profile
+
 - **Method**: `PUT`
 - **URL**: `/api/profile/<user_id>`
-- **Description**: Update a user’s profile data.
-- **Authentication**: Required (JWT, only the profile owner).
+- **Description**: Update a user’s profile details. Supports JSON or form-data requests. Users can update their profile picture via file upload or a URL (including Base64 data URLs).
+- **Authentication**: Required (JWT, only the profile owner can update).
+- **Content-Type**: `application/json` or `multipart/form-data`
 
-#### Path Parameters
+## Path Parameters
+
 | Parameter   | Type    | Description     | Notes            |
 | ----------- | ------- | --------------- | ---------------- |
 | `user_id` * | Integer | User identifier | Positive integer |
 
-#### Request Body
+## Request Body
+
 | Field        | Type         | Description         | Notes                                            |
 | ------------ | ------------ | ------------------- | ------------------------------------------------ |
-| `last_name`  | String       | Last name           | Optional                                         |
 | `first_name` | String       | First name          | Optional                                         |
+| `last_name`  | String       | Last name           | Optional                                         |
 | `department` | String       | Department or major | Optional                                         |
-| `skills`     | Array/String | List of skills      | Optional, can be array or comma-separated string |
-| `photo`      | String       | Photo URL           | Optional                                         |
+| `skills`     | Array/String | List of skills      | Optional, can be an array or comma-separated string |
+| `photo`      | File         | Profile picture file | Optional; supported types: PNG, JPG, JPEG (used with `multipart/form-data`) |
+| `photo_url`  | String       | Profile picture URL | Optional; must be HTTP/HTTPS or Base64 (e.g., `data:image/png;base64,...`) |
 | `email`      | String       | Email address       | Optional                                         |
 | `password`   | String       | Password            | Optional, minimum 8 characters                   |
-| `role`       | String       | User role           | Optional, accepts 'user' or 'admin' only         |
 
-**Example**:
+**Notes**:
+- The `role` field is not allowed to be updated through this endpoint to prevent privilege escalation.
+- If both `photo` and `photo_url` are provided, the uploaded `photo` file takes precedence.
+- At least one field must be provided for the update.
+
+**Example (JSON)**:
 ```json
 {
-  "last_name": "Mohamed",
   "first_name": "Ahmed",
+  "last_name": "Mohamed",
   "department": "Software Engineering",
   "skills": ["Python", "Java", "SQL"],
-  "photo": "https://example.com/photos/ahmed_new.jpg",
+  "photo_url": "https://example.com/photos/ahmed_new.jpg",
   "email": "ahmed.mohamed@example.com"
 }
 ```
 
-#### Responses
+**Example (Form-data)**:
+```
+first_name: Ahmed
+last_name: Mohamed
+department: Software Engineering
+skills: Python,Java,SQL
+photo: (binary file, e.g., ahmed_new.jpg)
+email: ahmed.mohamed@example.com
+```
+
+## Responses
+
 - **200 OK**:
   ```json
   {
     "message": "User updated successfully",
     "user": {
       "id": 123,
-      "last_name": "Mohamed",
       "first_name": "Ahmed",
+      "last_name": "Mohamed",
       "email": "ahmed.mohamed@example.com",
       "department": "Software Engineering",
       "skills": ["Python", "Java", "SQL"],
-      "photo": "https://example.com/photos/ahmed_new.jpg",
+      "photo": "https://example.com/static/uploads/ahmed_mohamed_ahmed_new.jpg",
       "role": "user"
     }
   }
   ```
-- **400 Bad Request**:
+
+- **400 Bad Request** (No update data provided):
   ```json
   {"error": "No update data provided"}
   ```
-- **400 Bad Request**:
+
+- **400 Bad Request** (No valid fields provided for update):
   ```json
   {"error": "No valid fields provided for update"}
   ```
-- **401 Unauthorized**:
+
+- **400 Bad Request** (Invalid or unsupported file type for photo):
   ```json
-  {"error": "Invalid token identity"}
+  {"error": "Invalid or unsupported file type"}
   ```
-- **403 Forbidden**:
+
+- **400 Bad Request** (Invalid photo URL format):
+  ```json
+  {"error": "Invalid photo URL format"}
+  ```
+
+- **403 Forbidden** (Attempt to update `role` field):
+  ```json
+  {"error": "Unauthorized: Role cannot be updated via this endpoint"}
+  ```
+
+- **403 Forbidden** (Attempt to update another user’s profile):
   ```json
   {"error": "Unauthorized: You can only update your own profile"}
   ```
+
 - **404 Not Found**:
   ```json
   {"error": "User not found"}
   ```
+
 - **500 Internal Server Error**:
   ```json
   {"error": "Failed to update user"}
   ```
 
-#### JavaScript Example (Frontend):
+## JavaScript Example (Frontend)
+
 ```javascript
-async function updateUserProfile(userId, updateData, token) {
+async function updateUserProfile(userId, updateData, token, isFormData = false) {
   try {
-    const response = await fetch(`https://educonnect-wp9t.onrender.com/api/profile/${userId}`, {
+    const url = `https://educonnect-wp9t.onrender.com/api/profile/${userId}`;
+    let options = {
       method: 'PUT',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify(updateData),
-    });
+      credentials: 'include' // Required to send session cookies
+    };
 
+    if (isFormData) {
+      // For form-data (e.g., with file upload)
+      const formData = new FormData();
+      for (const key in updateData) {
+        if (Array.isArray(updateData[key])) {
+          formData.append(key, updateData[key].join(',')); // Convert array to comma-separated string
+        } else {
+          formData.append(key, updateData[key]);
+        }
+      }
+      options.body = formData;
+    } else {
+      // For JSON
+      options.headers['Content-Type'] = 'application/json';
+      options.body = JSON.stringify(updateData);
+    }
+
+    const response = await fetch(url, options);
     const data = await response.json();
+
     if (!response.ok) {
       throw new Error(data.error || 'Failed to update profile');
     }
+
     console.log('Profile updated:', data);
     return data;
   } catch (error) {
@@ -177,19 +234,33 @@ async function updateUserProfile(userId, updateData, token) {
   }
 }
 
-// Usage
+// Usage with JSON
 const userId = 123;
-const updateData = {
-  last_name: 'Mohamed',
+const updateDataJson = {
   first_name: 'Ahmed',
+  last_name: 'Mohamed',
   department: 'Software Engineering',
   skills: ['Python', 'Java', 'SQL'],
-  photo: 'https://example.com/photos/ahmed_new.jpg',
-  email: 'ahmed.mohamed@example.com',
+  photo_url: 'https://example.com/photos/ahmed_new.jpg',
+  email: 'ahmed.mohamed@example.com'
 };
 const jwtToken = 'your_jwt_token_here';
 
-updateUserProfile(userId, updateData, jwtToken)
+updateUserProfile(userId, updateDataJson, jwtToken)
+  .then(data => console.log(data))
+  .catch(error => console.error(error));
+
+// Usage with Form-data (e.g., with file upload)
+const updateDataForm = {
+  first_name: 'Ahmed',
+  last_name: 'Mohamed',
+  department: 'Software Engineering',
+  skills: ['Python', 'Java', 'SQL'],
+  photo: document.querySelector('input[type="file"]').files[0], // Example file input
+  email: 'ahmed.mohamed@example.com'
+};
+
+updateUserProfile(userId, updateDataForm, jwtToken, true)
   .then(data => console.log(data))
   .catch(error => console.error(error));
 ```

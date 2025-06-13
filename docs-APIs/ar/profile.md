@@ -72,120 +72,194 @@ getProfile(1)
 ```
 
 ### 2. تحديث ملف المستخدم
+
 - **الطريقة**: `PUT`
-- **الرابط**: `/profile/<user_id>`
-- **الوصف**: تحديث تفاصيل الملف الشخصي للمستخدم المصادق عليه (يجب أن يكون المستخدم هو صاحب الملف).
-- **المصادقة**: مطلوبة (جلسة مستخدم نشطة).
+- **الرابط**: `/api/profile/<user_id>`
+- **الوصف**: تحديث بيانات ملف المستخدم. يدعم طلبات JSON أو form-data. يمكن للمستخدمين تحديث الصورة الشخصية عبر رفع ملف أو رابط URL (بما في ذلك روابط بيانات Base64).
+- **المصادقة**: مطلوبة (JWT، يمكن لمالك الملف فقط التحديث).
+- **نوع المحتوى**: `application/json` أو `multipart/form-data`
 
-#### جسم الطلب
-| الحقل          | النوع   | الوصف                     | ملاحظات                     |
-|----------------|---------|---------------------------|-----------------------------|
-| `first_name`   | String  | الاسم الأول              | اختياري                    |
-| `last_name`    | String  | الاسم الأخير             | اختياري                    |
-| `email`        | String  | البريد الإلكتروني        | اختياري، يجب أن يكون صالحًا |
-| `password`     | String  | كلمة المرور              | اختياري، لا تقل عن 8 أحرف |
-| `department`   | String  | القسم/التخصص             | اختياري                    |
-| `skills`       | String/Array | المهارات            | اختياري، مفصولة بفواصل أو قائمة |
-| `photo`        | String  | رابط صورة الملف الشخصي   | اختياري                    |
+## معلمات المسار
 
-**ملاحظة**: حقل `role` غير مسموح به لمنع تصعيد الصلاحيات.
+| المعلم       | النوع   | الوصف             | ملاحظات            |
+| ------------- | ------- | ----------------- | ------------------ |
+| `user_id` *   | عدد صحيح | معرف المستخدم    | عدد صحيح إيجابي   |
 
-**مثال**:
+## جسم الطلب
+
+| الحقل        | النوع        | الوصف               | ملاحظات                                            |
+| ------------- | ------------ | ------------------- | -------------------------------------------------- |
+| `first_name`  | نص           | الاسم الأول        | اختياري                                           |
+| `last_name`   | نص           | الاسم الأخير       | اختياري                                           |
+| `department`  | نص           | القسم أو التخصص    | اختياري                                           |
+| `skills`      | مصفوفة/نص   | قائمة المهارات     | اختياري، يمكن أن تكون مصفوفة أو سلسلة مفصولة بفواصل |
+| `photo`       | ملف          | ملف الصورة الشخصية | اختياري؛ الأنواع المدعومة: PNG، JPG، JPEG (يُستخدم مع `multipart/form-data`) |
+| `photo_url`   | نص           | رابط الصورة الشخصية | اختياري؛ يجب أن يكون رابط HTTP/HTTPS أو Base64 (مثال: `data:image/png;base64,...`) |
+| `email`       | نص           | البريد الإلكتروني  | اختياري                                           |
+| `password`    | نص           | كلمة المرور        | اختياري، 8 أحرف على الأقل                        |
+
+**ملاحظات**:
+- الحقل `role` غير مدعوم للتحديث عبر هذه الواجهة لمنع التلاعب بالصلاحيات.
+- إذا تم تقديم كل من `photo` و `photo_url`، يتم الأولوية لملف `photo` المرفوع.
+- يجب تقديم حقل واحد على الأقل للتحديث.
+
+**مثال (JSON)**:
 ```json
 {
-  "first_name": "Ahmed",
-  "last_name": "Benali",
-  "email": "ahmed.benali@example.com",
-  "password": "newpassword123",
-  "department": "Computer Science",
-  "skills": ["Python", "JavaScript"],
-  "photo": "https://example.com/photos/ahmed.jpg"
+  "first_name": "أحمد",
+  "last_name": "محمد",
+  "department": "هندسة البرمجيات",
+  "skills": ["Python", "Java", "SQL"],
+  "photo_url": "https://example.com/photos/ahmed_new.jpg",
+  "email": "ahmed.mohamed@example.com"
 }
 ```
 
-#### الاستجابات
-- **200 OK**:
+**مثال (Form-data)**:
+```
+first_name: أحمد
+last_name: محمد
+department: هندسة البرمجيات
+skills: Python,Java,SQL
+photo: (ملف ثنائي، مثال: ahmed_new.jpg)
+email: ahmed.mohamed@example.com
+```
+
+## الردود
+
+- **200 ناجح**:
   ```json
   {
-    "message": "User updated successfully",
+    "message": "تم تحديث المستخدم بنجاح",
     "user": {
-      "id": 1,
-      "last_name": "Benali",
-      "first_name": "Ahmed",
-      "email": "ahmed.benali@example.com",
-      "department": "Computer Science",
-      "skills": ["Python", "JavaScript"],
-      "photo": "https://example.com/photos/ahmed.jpg",
-      "role": "user"
+      "id": 123,
+      "first_name": "أحمد",
+      "last_name": "محمد",
+      "email": "ahmed.mohamed@example.com",
+      "department": "هندسة البرمجيات",
+      "skills": ["Python", "Java", "SQL"],
+      "photo": "https://example.com/static/uploads/ahmed_mohamed_ahmed_new.jpg",
+      "role": "مستخدم"
     }
   }
   ```
-- **400 Bad Request**:
+
+- **400 طلب غير صالح** (لم يتم تقديم بيانات للتحديث):
   ```json
-  {"error": "No update data provided"}
-  ```
-- **400 Bad Request**:
-  ```json
-  {"error": "No valid fields provided for update"}
-  ```
-- **403 Forbidden**:
-  ```json
-  {"error": "Unauthorized: You can only update your own profile"}
-  ```
-- **403 Forbidden**:
-  ```json
-  {"error": "Unauthorized: Role cannot be updated via this endpoint"}
-  ```
-- **404 Not Found**:
-  ```json
-  {"error": "User not found"}
-  ```
-- **500 Internal Server Error**:
-  ```json
-  {"error": "Failed to update user"}
+  {"error": "لم يتم تقديم بيانات للتحديث"}
   ```
 
-#### مثال JavaScript (Frontend):
+- **400 طلب غير صالح** (لم يتم تقديم حقول صالحة للتحديث):
+  ```json
+  {"error": "لم يتم تقديم حقول صالحة للتحديث"}
+  ```
+
+- **400 طلب غير صالح** (نوع ملف غير صالح أو غير مدعوم للصورة):
+  ```json
+  {"error": "نوع ملف غير صالح أو غير مدعوم"}
+  ```
+
+- **400 طلب غير صالح** (رابط صورة غير صالح):
+  ```json
+  {"error": "صيغة رابط صورة غير صالحة"}
+  ```
+
+- **403 ممنوع** (محاولة تحديث حقل `role`):
+  ```json
+  {"error": "غير مصرح: لا يمكن تحديث الدور عبر هذه الواجهة"}
+  ```
+
+- **403 ممنوع** (محاولة تحديث ملف مستخدم آخر):
+  ```json
+  {"error": "غير مصرح: يمكنك فقط تحديث ملفك الشخصي"}
+  ```
+
+- **404 غير موجود**:
+  ```json
+  {"error": "المستخدم غير موجود"}
+  ```
+
+- **500 خطأ داخلي في الخادم**:
+  ```json
+  {"error": "فشل في تحديث المستخدم"}
+  ```
+
+## مثال JavaScript (واجهة المستخدم)
+
 ```javascript
-async function updateProfile(userId, profileData) {
+async function updateUserProfile(userId, updateData, token, isFormData = false) {
   try {
-    const response = await fetch(`https://educonnect-wp9t.onrender.com/profile/${userId}`, {
+    const url = `https://educonnect-wp9t.onrender.com/api/profile/${userId}`;
+    let options = {
       method: 'PUT',
       headers: {
-        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify(profileData),
-      credentials: 'include'
-    });
+      credentials: 'include' // مطلوب لإرسال ملفات تعريف الارتباط للجلسة
+    };
 
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to update profile');
+    if (isFormData) {
+      // لـ form-data (مثال: مع رفع ملف)
+      const formData = new FormData();
+      for (const key in updateData) {
+        if (Array.isArray(updateData[key])) {
+          formData.append(key, updateData[key].join(',')); // تحويل المصفوفة إلى سلسلة مفصولة بفواصل
+        } else {
+          formData.append(key, updateData[key]);
+        }
+      }
+      options.body = formData;
+    } else {
+      // لـ JSON
+      options.headers['Content-Type'] = 'application/json';
+      options.body = JSON.stringify(updateData);
     }
-    console.log('Profile updated successfully:', data);
+
+    const response = await fetch(url, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'فشل في تحديث الملف الشخصي');
+    }
+
+    console.log('تم تحديث الملف الشخصي:', data);
     return data;
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('خطأ:', error.message);
     throw error;
   }
 }
 
-// استخدام الدالة
-const profileData = {
-  first_name: 'Ahmed',
-  last_name: 'Benali',
-  email: 'ahmed.benali@example.com',
-  password: 'newpassword123',
-  department: 'Computer Science',
-  skills: ['Python', 'JavaScript'],
-  photo: 'https://example.com/photos/ahmed.jpg'
+// الاستخدام مع JSON
+const userId = 123;
+const updateDataJson = {
+  first_name: 'أحمد',
+  last_name: 'محمد',
+  department: 'هندسة البرمجيات',
+  skills: ['Python', 'Java', 'SQL'],
+  photo_url: 'https://example.com/photos/ahmed_new.jpg',
+  email: 'ahmed.mohamed@example.com'
+};
+const jwtToken = 'your_jwt_token_here';
+
+updateUserProfile(userId, updateDataJson, jwtToken)
+  .then(data => console.log(data))
+  .catch(error => console.error(error));
+
+// الاستخدام مع Form-data (مثال: مع رفع ملف)
+const updateDataForm = {
+  first_name: 'أحمد',
+  last_name: 'محمد',
+  department: 'هندسة البرمجيات',
+  skills: ['Python', 'Java', 'SQL'],
+  photo: document.querySelector('input[type="file"]').files[0], // مثال إدخال ملف
+  email: 'ahmed.mohamed@example.com'
 };
 
-updateProfile(1, profileData)
+updateUserProfile(userId, updateDataForm, jwtToken, true)
   .then(data => console.log(data))
   .catch(error => console.error(error));
 ```
-
 ### 3. حذف ملف المستخدم
 - **الطريقة**: `DELETE`
 - **الرابط**: `/profile/<user_id>`

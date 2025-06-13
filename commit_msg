@@ -1,1 +1,1 @@
-Add image upload support to user registration, profile update, and post creation/editing (modified auth.py and posts.py)
+fix(docs): update API documentation to reflect recent changes

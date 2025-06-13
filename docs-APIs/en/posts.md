@@ -19,26 +19,42 @@ The Posts APIs provide tools for managing posts, including creating new posts, r
 ### 1. Create Post
 - **Method**: `POST`
 - **URL**: `/posts`
-- **Description**: Create a new post for the authenticated user.
-- **Authentication**: Required (active user session).
+- **Description**: Create a new post for the authenticated user with an optional image (either as a file upload or a URL).
+- **Authentication**: Required (active user session via `login_required`).
 
-#### Request Body
-| Field       | Type   | Description  | Notes           |
-| ----------- | ------ | ------------ | --------------- |
-| `title` *   | String | Post title   | Cannot be empty |
-| `content` * | String | Post content | Cannot be empty |
-| `image`     | String | Image URL    | Optional        |
+### Request
+- **Content-Type**: 
+  - `application/json` for JSON data.
+  - `multipart/form-data` for file uploads with form fields.
+- **Body**:
+  | Field       | Type   | Description                     | Notes                              |
+  |-------------|--------|---------------------------------|------------------------------------|
+  | `title` *   | String | Post title                      | Required, cannot be empty or whitespace |
+  | `content` * | String | Post content                    | Required, cannot be empty or whitespace |
+  | `image`     | File   | Image file                      | Optional, must be a valid file type (e.g., `.jpg`, `.png`) if provided |
+  | `image_url` | String | Image URL                       | Optional, must start with `http://` or `https://` if provided |
 
-**Example**:
+  **Notes**:
+  - If both `image` (file) and `image_url` are provided, the uploaded file takes priority.
+  - Supported file types for `image` are defined by the backend (e.g., `.jpg`, `.png`, `.gif`).
+
+**Example (JSON)**:
 ```json
 {
   "title": "New Project Announcement",
   "content": "We are excited to announce a new project...",
-  "image": "https://example.com/images/project.jpg"
+  "image_url": "https://example.com/images/project.jpg"
 }
 ```
 
-#### Responses
+**Example (Form-Data)**:
+```
+title: New Project Announcement
+content: We are excited to announce a new project...
+image: (binary file, e.g., project.jpg)
+```
+
+### Responses
 - **201 Created**:
   ```json
   {
@@ -47,7 +63,7 @@ The Posts APIs provide tools for managing posts, including creating new posts, r
       "id": 1,
       "title": "New Project Announcement",
       "content": "We are excited to announce a new project...",
-      "image": "https://example.com/images/project.jpg",
+      "image": "https://educonnect-wp9t.onrender.com/static/uploads_posts/1_1697051234.567_project.jpg",
       "created_at": "2025-05-22T07:28:00Z",
       "user_id": 1,
       "author": {
@@ -58,13 +74,21 @@ The Posts APIs provide tools for managing posts, including creating new posts, r
     }
   }
   ```
-- **400 Bad Request**:
+- **400 Bad Request** (Invalid request data):
   ```json
   {"error": "Invalid request data"}
   ```
-- **400 Bad Request**:
+- **400 Bad Request** (Empty title or content):
   ```json
   {"error": "Title and content cannot be empty"}
+  ```
+- **400 Bad Request** (Invalid file type):
+  ```json
+  {"error": "Invalid or unsupported file type for image"}
+  ```
+- **400 Bad Request** (Invalid image URL):
+  ```json
+  {"error": "Invalid image URL"}
   ```
 - **401 Unauthorized**:
   ```json
@@ -75,16 +99,22 @@ The Posts APIs provide tools for managing posts, including creating new posts, r
   {"error": "Failed to create post"}
   ```
 
-#### JavaScript Example (Frontend):
+### JavaScript Example (Frontend)
 ```javascript
-async function createPost(postData) {
+async function createPost(postData, imageFile = null) {
   try {
+    const formData = new FormData();
+    formData.append('title', postData.title);
+    formData.append('content', postData.content);
+    if (imageFile) {
+      formData.append('image', imageFile);
+    } else if (postData.image_url) {
+      formData.append('image_url', postData.image_url);
+    }
+
     const response = await fetch('https://educonnect-wp9t.onrender.com/posts', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(postData),
+      body: formData,
       credentials: 'include'
     });
 
@@ -104,10 +134,17 @@ async function createPost(postData) {
 const postData = {
   title: 'New Project Announcement',
   content: 'We are excited to announce a new project...',
-  image: 'https://example.com/images/project.jpg'
+  image_url: 'https://example.com/images/project.jpg'
 };
 
+// Example with image URL
 createPost(postData)
+  .then(data => console.log(data))
+  .catch(error => console.error(error));
+
+// Example with image file
+const imageFile = document.querySelector('#imageInput').files[0];
+createPost({ title: postData.title, content: postData.content }, imageFile)
   .then(data => console.log(data))
   .catch(error => console.error(error));
 ```
@@ -451,26 +488,44 @@ getAllPosts(1, 10)
 ### 7. Update Post
 - **Method**: `PUT`
 - **URL**: `/posts/<post_id>`
-- ** Trip Description**: Update an existing post (only for the post owner or admins).
-- **Authentication**: Required (active user session).
+- **Description**: Update an existing post (only for the post owner or admins).
+- **Authentication**: Required (active user session via `login_required`).
 
-#### Request Body
-| Field       | Type   | Description  | Notes           |
-| ----------- | ------ | ------------ | --------------- |
-| `title` *   | String | Post title   | Cannot be empty |
-| `content` * | String | Post content | Cannot be empty |
-| `image`     | String | Image URL    | Optional        |
+### Request
+- **Content-Type**: 
+  - `application/json` for JSON data.
+  - `multipart/form-data` for file uploads with form fields.
+- **Body**:
+  | Field       | Type   | Description                     | Notes                              |
+  |-------------|--------|---------------------------------|------------------------------------|
+  | `title` *   | String | Post title                      | Required, cannot be empty or whitespace |
+  | `content` * | String | Post content                    | Required, cannot be empty or whitespace |
+  | `image`     | File   | Image file                      | Optional, must be a valid file type (e.g., `.jpg`, `.png`) if provided |
+  | `image_url` | String | Image URL                       | Optional, must start with `http://` or `https://` if provided, or empty to clear the image |
 
-**Example**:
+  **Notes**:
+  - If both `image` (file) and `image_url` are provided, the uploaded file takes priority.
+  - If no new image is provided, the existing image is retained.
+  - Sending an empty `image_url` (`""`) clears the existing image.
+  - Supported file types for `image` are defined by the backend (e.g., `.jpg`, `.png`, `.gif`).
+
+**Example (JSON)**:
 ```json
 {
   "title": "Updated Project Announcement",
   "content": "Updated content for the project announcement...",
-  "image": "https://example.com/images/updated_project.jpg"
+  "image_url": "https://example.com/images/updated_project.jpg"
 }
 ```
 
-#### Responses
+**Example (Form-Data)**:
+```
+title: Updated Project Announcement
+content: Updated content for the project announcement...
+image: (binary file, e.g., updated_project.jpg)
+```
+
+### Responses
 - **200 OK**:
   ```json
   {
@@ -479,7 +534,7 @@ getAllPosts(1, 10)
       "id": 1,
       "title": "Updated Project Announcement",
       "content": "Updated content for the project announcement...",
-      "image": "https://example.com/images/updated_project.jpg",
+      "image": "https://educonnect-wp9t.onrender.com/static/uploads_posts/1_1697051234.567_updated_project.jpg",
       "created_at": "2025-05-22T07:28:00Z",
       "user_id": 1,
       "author": {
@@ -490,13 +545,21 @@ getAllPosts(1, 10)
     }
   }
   ```
-- **400 Bad Request**:
+- **400 Bad Request** (Invalid request data):
   ```json
   {"error": "Invalid request data"}
   ```
-- **400 Bad Request**:
+- **400 Bad Request** (Empty title or content):
   ```json
   {"error": "Title and content cannot be empty"}
+  ```
+- **400 Bad Request** (Invalid file type):
+  ```json
+  {"error": "Invalid or unsupported file type for image"}
+  ```
+- **400 Bad Request** (Invalid image URL):
+  ```json
+  {"error": "Invalid image URL"}
   ```
 - **401 Unauthorized**:
   ```json
@@ -515,22 +578,28 @@ getAllPosts(1, 10)
   {"error": "Failed to update post"}
   ```
 
-#### JavaScript Example (Frontend):
+### JavaScript Example (Frontend)
 ```javascript
-async function updatePost(postId, postData) {
+async function updatePost(postId, postData, imageFile = null) {
   try {
+    const formData = new FormData();
+    formData.append('title', postData.title);
+    formData.append('content', postData.content);
+    if (imageFile) {
+      formData.append('image', imageFile);
+    } else if (postData.image_url !== undefined) {
+      formData.append('image_url', postData.image_url);
+    }
+
     const response = await fetch(`https://educonnect-wp9t.onrender.com/posts/${postId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(postData),
+      body: formData,
       credentials: 'include'
     });
 
     const data = await response.json();
     if (!response.ok) {
-    throw new Error(data.error || 'Failed to update post');
+      throw new Error(data.error || 'Failed to update post');
     }
     console.log('Post updated successfully:', data);
     return data;
@@ -544,10 +613,22 @@ async function updatePost(postId, postData) {
 const postData = {
   title: 'Updated Project Announcement',
   content: 'Updated content for the project announcement...',
-  image: 'https://example.com/images/updated_project.jpg'
+  image_url: 'https://example.com/images/updated_project.jpg'
 };
 
+// Example with image URL
 updatePost(1, postData)
+  .then(data => console.log(data))
+  .catch(error => console.error(error));
+
+// Example with image file
+const imageFile = document.querySelector('#imageInput').files[0];
+updatePost(1, { title: postData.title, content: postData.content }, imageFile)
+  .then(data => console.log(data))
+  .catch(error => console.error(error));
+
+// Example to clear the image
+updatePost(1, { title: postData.title, content: postData.content, image_url: '' })
   .then(data => console.log(data))
   .catch(error => console.error(error));
 ```
