@@ -1,21 +1,4 @@
 
 -----
 
-Add image upload support to user registration, profile update, and post creation/editing (modified auth.py and posts.py)
------
-
-fix(docs): update API documentation to reflect recent changes
-
------
-
-Add mock conversations and sample posts for users and admin
-
-- Created fake chat interactions between users for testing/demo purposes  
-- Added sample posts for both regular users and admin accounts
-
------
-
-for testing, no changing 
------
-
-docs(changelog): update CHANGELOG with latest backend changes
+force restart render
