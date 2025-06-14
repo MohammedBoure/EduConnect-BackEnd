@@ -1,3 +1,26 @@
+
+## [1.1.0] - 2025-06-14
+
+### Added
+-  **Image Upload Support**
+  - Added support for uploading images during:
+    - User registration
+    - Profile updates
+    - Post creation and editing
+  - Modified `auth.py` and `posts.py` accordingly.
+
+-  **Mock Data for Testing and Demo**
+  - Created mock chat conversations between users.
+  - Added sample posts for:
+    - Regular user accounts
+    - Admin accounts
+
+### Changed
+-  **API Documentation**
+  - Updated API documentation to reflect:
+    - Image upload features
+    - New mock data structure
+
 ## [1.0.0] - 2025-06-11
 
 ### Features
