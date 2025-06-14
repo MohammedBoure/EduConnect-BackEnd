@@ -15,11 +15,10 @@ def log_admin_action(admin_id, action, resource_type, resource_id, details=None)
 comments_bp = Blueprint('comments', __name__)
 
 @comments_bp.route('/posts/<int:post_id>/comments', methods=['POST'])
-@login_required()  # Restrict to logged-in users only
+@login_required()
 def add_comment(post_id):
     """Add a comment to a post."""
     try:
-        # Verify post exists
         if not post_manager.get_post_by_id(post_id):
             return jsonify({'error': 'Post not found'}), 404
 
@@ -27,14 +26,12 @@ def add_comment(post_id):
         if 'content' not in new_comment or 'created_at' not in new_comment:
             return jsonify({'error': 'Missing content or created_at field'}), 400
 
-        # Prevent user_id in request body
         if 'user_id' in new_comment:
             return jsonify({'error': 'Specifying user_id is not allowed'}), 403
 
         content = new_comment['content']
         created_at = new_comment['created_at']
 
-        # Validate content length
         if len(content.strip()) == 0 or len(content) > 1000:
             return jsonify({'error': 'Content must be between 1 and 1000 characters'}), 400
 
@@ -46,7 +43,6 @@ def add_comment(post_id):
         elif not isinstance(created_at, datetime.datetime):
             return jsonify({'error': 'created_at must be a datetime object or ISO format string'}), 400
 
-        # Get the authenticated user's ID from the session
         user_id = session.get('user_id')
         if user_id is None:
             return jsonify({'error': 'User not authenticated'}), 401
@@ -110,7 +106,7 @@ def get_comments(post_id):
     }), 200
 
 @comments_bp.route('/comments/<int:comment_id>', methods=['PUT'])
-@login_required()  # Require session authentication
+@login_required()
 def update_comment(comment_id):
     """Update an existing comment."""
     comment = comment_manager.get_comment_by_id(comment_id)
@@ -126,10 +122,18 @@ def update_comment(comment_id):
         admin_id = session.get('user_id', 0)
         log_admin_action(admin_id, 'update_comment', 'comment', comment_id, f"New content: {content[:50]}...")
         updated_comment = comment_manager.get_comment_by_id(comment_id)
+        
+
+        created_at_iso = ""
+        if isinstance(updated_comment['created_at'], datetime.datetime):
+            created_at_iso = updated_comment['created_at'].isoformat() + "Z"
+        else:
+            created_at_iso = str(updated_comment['created_at'])
+
         comment_data = {
             'id': updated_comment['id'],
             'content': updated_comment['content'],
-            'created_at': updated_comment['created_at'],
+            'created_at': created_at_iso,
             'post_id': updated_comment['post_id'],
             'user_id': updated_comment['user_id'],
             'author': {
@@ -138,11 +142,13 @@ def update_comment(comment_id):
                 'photo': updated_comment['photo']
             }
         }
+
+        
         return jsonify({'message': 'Comment updated successfully', 'comment': comment_data}), 200
     return jsonify({'error': 'Failed to update comment'}), 500
 
 @comments_bp.route('/comments/<int:comment_id>', methods=['DELETE'])
-@login_required()  # Require session authentication
+@login_required()
 def delete_comment(comment_id):
     """Delete a comment by ID."""
     if session.get('user_id') is None:
